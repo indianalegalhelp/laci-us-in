@@ -1,0 +1,101 @@
+# This file is part of LACI.
+#
+# LACI is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+# as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+#
+# LACI is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License along with LACI.
+# If not, see <https://www.gnu.org/licenses/>.
+#
+# Copyright 2025-2026, Indiana Legal Help
+#
+terms:
+  'Indiana Code':
+    children:
+      'Title 1 - General Provisions':
+        description: null
+      'Title 4 - State Offices and Administration':
+        description: null
+      'Title 5 - State and Local Administration':
+        description: null
+      'Title 6 - Governor':
+        description: null
+      'Title 8 - Public Utilities':
+        description: null
+      'Title 9 - Transportation':
+        description: null
+      'Title 10 - Public Safety':
+        description: null
+      'Title 11 - Corrections':
+        description: null
+      'Title 12 - Human Services':
+        description: null
+      'Title 13 - Government Finance':
+        description: null
+      'Title 14 - Natural and Cultural Resources':
+        description: null
+      'Title 15 - Agriculture and Animals':
+        description: null
+      'Title 16 - Professions and Occupations':
+        description: null
+      'Title 17 - Elections':
+        description: null
+      'Title 18 - Local Government':
+        description: null
+      'Title 19 - Gaming':
+        description: null
+      'Title 20 - Education':
+        description: null
+      'Title 21 - Higher Education':
+        description: null
+      'Title 22 - Labor and Safety':
+        description: null
+      'Title 23 - Business and Other Associations':
+        description: null
+      'Title 24 - Trade Regulation':
+        description: null
+      'Title 25 - Professions and Occupations':
+        description: null
+      'Title 26 - Financial Institutions':
+        description: null
+      'Title 27 - Insurance':
+        description: null
+      'Title 28 - Estates; Trusts; Fiduciaries':
+        description: null
+      'Title 29 - Probate':
+        description: null
+      'Title 30 - Corporations':
+        description: null
+      'Title 31 - Family Law and Juvenile Law':
+        description: null
+      'Title 32 - Courts and Court Officers':
+        description: null
+      'Title 33 - Courts; Court Officers; Judicial Administration':
+        description: null
+      'Title 34 - Civil Law and Procedure':
+        description: null
+      'Title 35 - Criminal Law and Procedure':
+        description: null
+      'Title 36 - Local Government':
+        description: null
+    description: ''
+  'Indiana Administrative Code':
+    children: {  }
+    description: ''
+  'Indiana Rules of Trial Procedure':
+    children: {  }
+    description: null
+  'Indiana Rules of Evidence':
+    children: {  }
+    description: null
+  'Indiana Rules of Appellate Procedure':
+    children: {  }
+    description: null
+  'Indiana Rules of Criminal Procedure':
+    children: {  }
+    description: null
+  'Indiana Appellate Decisions':
+    children: {  }
+    description: null

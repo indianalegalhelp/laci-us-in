@@ -1,0 +1,15 @@
+{
+    "name": "laci/laci_indiana",
+    "description": "Parsers for Indiana Authorities: Indiana Code, IAC, Court Rules, and Appellate Decisions",
+    "type": "drupal-module",
+    "license": "AGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Indiana Legal Help",
+            "email": "info@indianalegalhelp.org"
+        }
+    ],
+    "require": {
+      "laci/laci_core": ">=1.8.3"
+    }
+}

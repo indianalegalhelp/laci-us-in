@@ -1,0 +1,59 @@
+<?php
+
+/**
+ * @file
+ * This file is part of LACI.
+ *
+ * LACI is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * LACI is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along with LACI.
+ * If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Copyright 2025-2026, Indiana Legal Help
+ */
+
+/**
+ * Implements hook_install().
+ */
+function laci_indiana_install() {
+  $module_name = 'laci_indiana';
+  $installer = \Drupal::service('laci_core.installer');
+  $installer->importAuthorityTypes($module_name);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function laci_indiana_uninstall() {
+  $logger = \Drupal::logger('laci_indiana');
+
+  $logger->notice('Starting laci_indiana module uninstall process.');
+
+  $uninstaller = \Drupal::service('laci_core.uninstall_validator');
+  $tids = $uninstaller->getTermIdsFromConfig('laci_indiana.authoritytype.default_terms', 'authoritativesourcetype');
+
+  if ($tids) {
+    $logger->notice('Found @count terms to purge.', [
+      '@count' => count($tids),
+    ]);
+
+    try {
+      $uninstaller->purgeTerms($tids);
+      $logger->notice('Successfully purged @count taxonomy terms during laci_indiana uninstall.', [
+        '@count' => count($tids),
+      ]);
+    } catch (\Exception $e) {
+      $logger->error('Failed to purge terms during laci_indiana uninstall: @message', [
+        '@message' => $e->getMessage(),
+      ]);
+    }
+  } else {
+    $logger->notice('No terms found to purge during laci_indiana uninstall.');
+  }
+
+  $logger->notice('Completed laci_indiana module uninstall process.');
+}
