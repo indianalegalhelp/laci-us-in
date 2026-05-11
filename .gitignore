@@ -1,2 +1,8 @@
 # Drupal vendor directory
 /vendor/
+
+#Texas Sample
+laci-us-tx*
+
+#Private
+LACI-Indiana-Scaffolding.md
