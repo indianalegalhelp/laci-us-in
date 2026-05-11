@@ -98,9 +98,8 @@ abstract class IndianaCourtRuleBase extends AuthoritySourceBase {
   private function extractRuleText(string $html) : string {
     $crawler = new Crawler($html);
 
-    // The rule content is in the main body of the page.
-    // Try to find the rule content area.
-    $content = $crawler->filter('main, .content, #content, article, .rule-content');
+    // The rule content is in #mc-main-content or [role=main].
+    $content = $crawler->filter('#mc-main-content, [role=main], main, .content, #content, article, .rule-content');
 
     if ($content->count() > 0) {
       return $content->html();
