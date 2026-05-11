@@ -1,0 +1,7 @@
+laci_indiana.settings:
+  type: config_object
+  label: 'LACI Indiana settings'
+  mapping:
+    ic_year:
+      type: string
+      label: 'Indiana Code year'

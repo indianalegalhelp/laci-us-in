@@ -1,0 +1,5 @@
+laci_indiana.settings:
+  title: 'LACI Indiana'
+  description: 'Configure Indiana Code year and other LACI Indiana settings.'
+  parent: system.admin_config_system
+  route_name: laci_indiana.settings

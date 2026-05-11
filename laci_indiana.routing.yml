@@ -1,0 +1,7 @@
+laci_indiana.settings:
+  path: '/admin/config/laci/indiana'
+  defaults:
+    _form: '\Drupal\laci_indiana\Form\LaciIndianaSettingsForm'
+    _title: 'LACI Indiana settings'
+  requirements:
+    _permission: 'administer site configuration'

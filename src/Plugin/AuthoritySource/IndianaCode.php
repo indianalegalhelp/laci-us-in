@@ -88,8 +88,8 @@ class IndianaCode extends AuthoritySourceBase {
    * Returns the year to use for the IC URL.
    */
   private function getYear() : string {
-    // TODO: Make this configurable via Drupal config.
-    return '2025';
+    $year = \Drupal::config('laci_indiana.settings')->get('ic_year');
+    return $year ?: '2025';
   }
 
   /**
