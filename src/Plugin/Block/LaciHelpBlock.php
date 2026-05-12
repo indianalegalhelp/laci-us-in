@@ -42,8 +42,13 @@ class LaciHelpBlock extends BlockBase {
    * {@inheritdoc}
    */
   public function build() {
+    $module_path = \Drupal::service('extension.list.module')->getPath('laci_indiana');
+    $template_path = DRUPAL_ROOT . '/' . $module_path . '/templates/laci-help-block.html.twig';
+    $template = file_get_contents($template_path);
+
     return [
-      '#theme' => 'laci_help_block',
+      '#type' => 'inline_template',
+      '#template' => $template ?: '<p>LACI Help: template not found</p>',
       '#attached' => [
         'library' => ['laci_indiana/help_sidebar'],
       ],
