@@ -67,6 +67,11 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
   // Ensure enabled values are integers for comparison.
   $enabled = array_map('intval', $enabled);
 
+  // Check field_type structure.
+  if (!isset($form['field_type']['widget']['#options'])) {
+    return;
+  }
+
   // Load the taxonomy tree to determine parent-child relationships.
   $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
     ->loadTree('authoritativesourcetype', 0, 2, FALSE);
@@ -81,9 +86,15 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
 
   if (isset($form['field_type']['widget']['#options'])) {
     // Handle optgroup structure: options may be [parent_name => [tid => label, ...]]
-    // or flat [tid => label]. Check first key type.
+    // or flat [tid => label]. Check first non-_none key type.
     $first_key = array_key_first($form['field_type']['widget']['#options']);
-    $is_optgroup = is_string($first_key) && !ctype_digit($first_key);
+    // Skip the "_none" placeholder to determine actual structure.
+    $check_key = $first_key;
+    if ($check_key === '_none') {
+      $keys = array_keys($form['field_type']['widget']['#options']);
+      $check_key = $keys[1] ?? NULL;
+    }
+    $is_optgroup = is_string($check_key) && !ctype_digit($check_key);
 
     if ($is_optgroup) {
       // Optgroup structure: filter within each group.
