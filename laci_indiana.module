@@ -39,6 +39,18 @@ function laci_indiana_form_alter(array &$form, \Drupal\Core\Form\FormStateInterf
 }
 
 /**
+ * Implements hook_form_FORM_ID_alter() for views_exposed_form.
+ */
+function laci_indiana_form_views_exposed_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  // Filter the term_node_tid_depth exposed filter on Views forms.
+  // This filter uses stdClass objects with nested 'option' arrays
+  // where keys are taxonomy term IDs.
+  if (isset($form['term_node_tid_depth']['#options'])) {
+    _laci_indiana_filter_term_depth_options($form['term_node_tid_depth']['#options']);
+  }
+}
+
+/**
  * Implements hook_form_FORM_ID_alter() for node_authoritativesource_form.
  */
 function laci_indiana_form_node_authoritativesource_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
@@ -53,19 +65,128 @@ function laci_indiana_form_node_authoritativesource_edit_form_alter(array &$form
 }
 
 /**
- * Filter authority type options based on enabled_authority_types config.
+ * Get the list of allowed authority type term IDs based on config.
+ *
+ * @return int[]|null
+ *   Array of allowed term IDs, or NULL if filtering is disabled.
  */
-function _laci_indiana_filter_authority_type_options(array &$form) {
+function _laci_indiana_get_allowed_type_ids() {
   $config = \Drupal::config('laci_indiana.settings');
   $enabled = $config->get('enabled_authority_types');
 
-  // If no types are explicitly enabled, show all (no filtering).
   if (empty($enabled)) {
+    return NULL;
+  }
+
+  $enabled = array_map('intval', $enabled);
+
+  // Also include parent term IDs that have enabled children.
+  $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
+    ->loadTree('authoritativesourcetype', 0, 2, FALSE);
+  $parent_children = [];
+  foreach ($tree as $term) {
+    if ($term->depth > 0 && !empty($term->parents[0])) {
+      $parent_children[$term->parents[0]][$term->tid] = $term->tid;
+    }
+  }
+  $allowed = $enabled;
+  foreach ($parent_children as $parent_tid => $children) {
+    foreach ($children as $child_tid) {
+      if (in_array($child_tid, $allowed, TRUE)) {
+        $allowed[] = $parent_tid;
+        break;
+      }
+    }
+  }
+  return array_unique($allowed);
+}
+
+/**
+ * Filter term_node_tid_depth options where values are stdClass objects.
+ *
+ * The Views exposed filter for taxonomy terms uses stdClass objects with
+ * an 'option' property containing [term_id => label] arrays.
+ */
+function _laci_indiana_filter_term_depth_options(array &$options) {
+  $allowed = _laci_indiana_get_allowed_type_ids();
+  if ($allowed === NULL) {
     return;
   }
 
-  // Ensure enabled values are integers for comparison.
-  $enabled = array_map('intval', $enabled);
+  foreach ($options as $key => $value) {
+    if ($key === 'All') {
+      continue;
+    }
+    $term_ids = [];
+    if (is_object($value)) {
+      $arr = (array) $value;
+      if (isset($arr['option']) && is_array($arr['option'])) {
+        $term_ids = array_map('intval', array_keys($arr['option']));
+      }
+    }
+    elseif (is_numeric($key) && (int) $key > 10) {
+      $term_ids = [(int) $key];
+    }
+
+    if (empty($term_ids)) {
+      continue;
+    }
+
+    $keep = FALSE;
+    foreach ($term_ids as $tid) {
+      if (in_array($tid, $allowed, TRUE)) {
+        $keep = TRUE;
+        break;
+      }
+    }
+    if (!$keep) {
+      unset($options[$key]);
+    }
+  }
+}
+
+/**
+ * Implements hook_views_query_alter().
+ */
+function laci_indiana_views_query_alter(\Drupal\views\ViewExecutable $view, \Drupal\views\Plugin\views\query\QueryPluginBase $query) {
+  // Filter authority source views by enabled authority types.
+  $authority_views = [
+    'all_authorities',
+    'authorities_with_errors',
+    'all_documents',
+    'your_documents',
+    'authority_errors',
+  ];
+  if (!in_array($view->id(), $authority_views)) {
+    return;
+  }
+
+  $allowed = _laci_indiana_get_allowed_type_ids();
+  if ($allowed === NULL) {
+    return;
+  }
+
+  // Add a JOIN to node__field_type and a WHERE condition.
+  $configuration = [
+    'left_table' => 'node_field_data',
+    'left_field' => 'nid',
+    'field' => 'entity_id',
+    'table' => 'node__field_type',
+  ];
+  $join = \Drupal::service('plugin.manager.views.join')->createInstance('standard', $configuration);
+  $query->ensureTable('node__field_type', 'node_field_data', $join);
+
+  $query->addWhere('laci_indiana_filter', 'node__field_type.field_type_target_id', $allowed, 'IN');
+}
+
+/**
+ * Filter authority type options based on enabled_authority_types config.
+ */
+function _laci_indiana_filter_authority_type_options(array &$form) {
+  $allowed = _laci_indiana_get_allowed_type_ids();
+  if ($allowed === NULL) {
+    return;
+  }
 
   // Check field_type structure.
   if (!isset($form['field_type']['widget']['#options'])) {
@@ -104,7 +225,7 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
         }
         foreach ($group_options as $tid => $label) {
           $tid = (int) $tid;
-          if (!in_array($tid, $enabled, TRUE)) {
+          if (!in_array($tid, $allowed, TRUE)) {
             unset($group_options[$tid]);
           }
         }
@@ -118,14 +239,14 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
       // Flat structure: filter directly.
       foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
         $tid_int = (int) $tid;
-        if (in_array($tid_int, $enabled, TRUE)) {
+        if (in_array($tid_int, $allowed, TRUE)) {
           continue;
         }
         // Keep parent if it has enabled children.
         if (isset($parent_children[$tid_int])) {
           $has_enabled_child = FALSE;
           foreach ($parent_children[$tid_int] as $child_tid) {
-            if (in_array($child_tid, $enabled, TRUE)) {
+            if (in_array($child_tid, $allowed, TRUE)) {
               $has_enabled_child = TRUE;
               break;
             }
