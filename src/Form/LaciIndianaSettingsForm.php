@@ -57,23 +57,58 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
       '#pattern' => '\d{4}',
     ];
 
-    // Authority type checkboxes.
-    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
-      ->loadTree('authoritativesourcetype', 0, 1, FALSE);
+    // Load the full taxonomy tree (2 levels deep).
+    $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
+      ->loadTree('authoritativesourcetype', 0, 2, FALSE);
+
     $enabled_types = $config->get('enabled_authority_types') ?: [];
 
-    $options = [];
-    foreach ($terms as $term) {
-      $options[$term->tid] = $term->name;
+    // Build a hierarchical structure: parents and their children.
+    $parents = [];
+    $children = [];
+    foreach ($tree as $term) {
+      if ($term->depth == 0) {
+        $parents[$term->tid] = $term->name;
+      }
+      else {
+        $children[$term->parents[0]][$term->tid] = $term->name;
+      }
     }
 
-    $form['enabled_authority_types'] = [
-      '#type' => 'checkboxes',
+    $form['authority_types'] = [
+      '#type' => 'fieldset',
       '#title' => $this->t('Enabled Authority Types'),
-      '#description' => $this->t('Select which authority types are available when creating authority sources. Unchecked types will be hidden from the dropdown.'),
-      '#options' => $options,
-      '#default_value' => $enabled_types,
+      '#description' => $this->t('Select which authority types are available when creating authority sources. Expand a parent type to pick specific sub-types.'),
+      '#tree' => TRUE,
     ];
+
+    // Parent-level checkboxes.
+    $form['authority_types']['parents'] = [
+      '#type' => 'checkboxes',
+      '#title' => $this->t('Authority Types'),
+      '#options' => $parents,
+      '#default_value' => array_filter($enabled_types, fn($id) => isset($parents[$id])),
+    ];
+
+    // Child term fieldsets for each parent that has children.
+    foreach ($children as $parent_tid => $child_terms) {
+      $parent_name = $parents[$parent_tid] ?? 'Parent';
+      $form['authority_types']['children_' . $parent_tid] = [
+        '#type' => 'details',
+        '#title' => $this->t('Sub-types for @parent', ['@parent' => $parent_name]),
+        '#open' => in_array($parent_tid, $enabled_types) ? TRUE : FALSE,
+        '#states' => [
+          'visible' => [
+            ':input[name="authority_types[parents][' . $parent_tid . ']"]' => ['checked' => TRUE],
+          ],
+        ],
+      ];
+      $form['authority_types']['children_' . $parent_tid]['terms'] = [
+        '#type' => 'checkboxes',
+        '#options' => $child_terms,
+        '#default_value' => array_filter($enabled_types, fn($id) => isset($child_terms[$id])),
+      ];
+    }
 
     return parent::buildForm($form, $form_state);
   }
@@ -92,10 +127,22 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) : void {
-    $enabled = array_filter($form_state->getValue('enabled_authority_types') ?: []);
+    $authority_types = $form_state->getValue('authority_types') ?: [];
+
+    // Collect enabled parent term IDs.
+    $enabled = array_filter($authority_types['parents'] ?: []);
+
+    // Collect enabled child term IDs from each children fieldset.
+    foreach ($authority_types as $key => $value) {
+      if (str_starts_with($key, 'children_') && isset($value['terms'])) {
+        $child_enabled = array_filter($value['terms'] ?: []);
+        $enabled = array_merge($enabled, $child_enabled);
+      }
+    }
+
     $this->config('laci_indiana.settings')
       ->set('ic_year', $form_state->getValue('ic_year'))
-      ->set('enabled_authority_types', array_values($enabled))
+      ->set('enabled_authority_types', array_values(array_map('intval', $enabled)))
       ->save();
 
     parent::submitForm($form, $form_state);

@@ -38,13 +38,52 @@ function laci_indiana_form_alter(array &$form, \Drupal\Core\Form\FormStateInterf
     $enabled = $config->get('enabled_authority_types');
 
     // If no types are explicitly enabled, show all (no filtering).
-    if (!empty($enabled)) {
-      if (isset($form['field_type']['widget']['#options'])) {
-        foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
-          if (!in_array((int) $tid, $enabled, TRUE)) {
-            unset($form['field_type']['widget']['#options'][$tid]);
+    if (empty($enabled)) {
+      return;
+    }
+
+    // Load the taxonomy tree to determine parent-child relationships.
+    $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
+      ->loadTree('authoritativesourcetype', 0, 2, FALSE);
+
+    // Build a map: parent_tid => [child_tid, ...]
+    $parent_children = [];
+    $child_parent = [];
+    foreach ($tree as $term) {
+      if ($term->depth > 0 && !empty($term->parents[0])) {
+        $parent_children[$term->parents[0]][$term->tid] = $term->tid;
+        $child_parent[$term->tid] = $term->parents[0];
+      }
+    }
+
+    if (isset($form['field_type']['widget']['#options'])) {
+      foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
+        $tid = (int) $tid;
+
+        // Check if this term is enabled.
+        if (in_array($tid, $enabled, TRUE)) {
+          continue;
+        }
+
+        // Check if this is a parent with enabled children.
+        // If the parent itself isn't enabled but some of its children are,
+        // we still need to show the parent in the dropdown (Drupal requires
+        // the parent optgroup for children to appear).
+        if (isset($parent_children[$tid])) {
+          $has_enabled_child = FALSE;
+          foreach ($parent_children[$tid] as $child_tid) {
+            if (in_array($child_tid, $enabled, TRUE)) {
+              $has_enabled_child = TRUE;
+              break;
+            }
+          }
+          if ($has_enabled_child) {
+            continue;
           }
         }
+
+        // Remove this option.
+        unset($form['field_type']['widget']['#options'][$tid]);
       }
     }
   }
