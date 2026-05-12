@@ -75,6 +75,20 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
       }
     }
 
+    // Sort children naturally (e.g., "Title 1" before "Title 10").
+    foreach ($children as $parent_tid => &$child_terms) {
+      uasort($child_terms, function ($a, $b) {
+        // Extract leading number for natural sort.
+        $num_a = preg_match('/^(\d+)/', $a, $m) ? (int) $m[1] : 0;
+        $num_b = preg_match('/^(\d+)/', $b, $m) ? (int) $m[1] : 0;
+        if ($num_a !== $num_b) {
+          return $num_a <=> $num_b;
+        }
+        return strnatcasecmp($a, $b);
+      });
+    }
+    unset($child_terms);
+
     $form['authority_types'] = [
       '#type' => 'fieldset',
       '#title' => $this->t('Enabled Authority Types'),
