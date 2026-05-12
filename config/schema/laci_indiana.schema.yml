@@ -5,3 +5,9 @@ laci_indiana.settings:
     ic_year:
       type: string
       label: 'Indiana Code year'
+    enabled_authority_types:
+      type: sequence
+      label: 'Enabled authority type term IDs'
+      sequence:
+        type: integer
+        label: 'Term ID'

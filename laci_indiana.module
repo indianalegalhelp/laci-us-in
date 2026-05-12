@@ -27,3 +27,25 @@ function laci_indiana_theme() {
     ],
   ];
 }
+
+/**
+ * Implements hook_form_alter().
+ */
+function laci_indiana_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state, string $form_id) {
+  // Filter the authority type dropdown on the Authority Source node form.
+  if ($form_id === 'node_authoritativesource_form' || $form_id === 'node_authoritativesource_edit_form') {
+    $config = \Drupal::config('laci_indiana.settings');
+    $enabled = $config->get('enabled_authority_types');
+
+    // If no types are explicitly enabled, show all (no filtering).
+    if (!empty($enabled)) {
+      if (isset($form['field_type']['widget']['#options'])) {
+        foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
+          if (!in_array((int) $tid, $enabled, TRUE)) {
+            unset($form['field_type']['widget']['#options'][$tid]);
+          }
+        }
+      }
+    }
+  }
+}

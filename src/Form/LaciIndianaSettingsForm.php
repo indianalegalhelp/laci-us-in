@@ -19,6 +19,7 @@ namespace Drupal\laci_indiana\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\taxonomy\Entity\Term;
 
 /**
  * Configure LACI Indiana settings.
@@ -56,6 +57,24 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
       '#pattern' => '\d{4}',
     ];
 
+    // Authority type checkboxes.
+    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
+      ->loadTree('authoritativesourcetype', 0, 1, FALSE);
+    $enabled_types = $config->get('enabled_authority_types') ?: [];
+
+    $options = [];
+    foreach ($terms as $term) {
+      $options[$term->id()] = $term->label();
+    }
+
+    $form['enabled_authority_types'] = [
+      '#type' => 'checkboxes',
+      '#title' => $this->t('Enabled Authority Types'),
+      '#description' => $this->t('Select which authority types are available when creating authority sources. Unchecked types will be hidden from the dropdown.'),
+      '#options' => $options,
+      '#default_value' => $enabled_types,
+    ];
+
     return parent::buildForm($form, $form_state);
   }
 
@@ -73,8 +92,10 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) : void {
+    $enabled = array_filter($form_state->getValue('enabled_authority_types') ?: []);
     $this->config('laci_indiana.settings')
       ->set('ic_year', $form_state->getValue('ic_year'))
+      ->set('enabled_authority_types', array_values($enabled))
       ->save();
 
     parent::submitForm($form, $form_state);
