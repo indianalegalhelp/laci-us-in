@@ -18,4 +18,3 @@ services:
       - { name: module_install.uninstall_validator }
     arguments: ['@laci_core.uninstall_validator' , '@string_translation']
 parameters:
-  laci_indiana.skip_procedural_hook_scan: true

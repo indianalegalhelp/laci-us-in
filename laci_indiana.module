@@ -34,44 +34,86 @@ function laci_indiana_theme() {
 function laci_indiana_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state, string $form_id) {
   // Filter the authority type dropdown on the Authority Source node form.
   if ($form_id === 'node_authoritativesource_form' || $form_id === 'node_authoritativesource_edit_form') {
-    $config = \Drupal::config('laci_indiana.settings');
-    $enabled = $config->get('enabled_authority_types');
+    _laci_indiana_filter_authority_type_options($form);
+  }
+}
 
-    // If no types are explicitly enabled, show all (no filtering).
-    if (empty($enabled)) {
-      return;
+/**
+ * Implements hook_form_FORM_ID_alter() for node_authoritativesource_form.
+ */
+function laci_indiana_form_node_authoritativesource_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  _laci_indiana_filter_authority_type_options($form);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for node_authoritativesource_edit_form.
+ */
+function laci_indiana_form_node_authoritativesource_edit_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  _laci_indiana_filter_authority_type_options($form);
+}
+
+/**
+ * Filter authority type options based on enabled_authority_types config.
+ */
+function _laci_indiana_filter_authority_type_options(array &$form) {
+  $config = \Drupal::config('laci_indiana.settings');
+  $enabled = $config->get('enabled_authority_types');
+
+  // If no types are explicitly enabled, show all (no filtering).
+  if (empty($enabled)) {
+    return;
+  }
+
+  // Ensure enabled values are integers for comparison.
+  $enabled = array_map('intval', $enabled);
+
+  // Load the taxonomy tree to determine parent-child relationships.
+  $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
+    ->loadTree('authoritativesourcetype', 0, 2, FALSE);
+
+  // Build a map: parent_tid => [child_tid, ...]
+  $parent_children = [];
+  foreach ($tree as $term) {
+    if ($term->depth > 0 && !empty($term->parents[0])) {
+      $parent_children[$term->parents[0]][$term->tid] = $term->tid;
     }
+  }
 
-    // Load the taxonomy tree to determine parent-child relationships.
-    $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
-      ->loadTree('authoritativesourcetype', 0, 2, FALSE);
+  if (isset($form['field_type']['widget']['#options'])) {
+    // Handle optgroup structure: options may be [parent_name => [tid => label, ...]]
+    // or flat [tid => label]. Check first key type.
+    $first_key = array_key_first($form['field_type']['widget']['#options']);
+    $is_optgroup = is_string($first_key) && !ctype_digit($first_key);
 
-    // Build a map: parent_tid => [child_tid, ...]
-    $parent_children = [];
-    $child_parent = [];
-    foreach ($tree as $term) {
-      if ($term->depth > 0 && !empty($term->parents[0])) {
-        $parent_children[$term->parents[0]][$term->tid] = $term->tid;
-        $child_parent[$term->tid] = $term->parents[0];
-      }
-    }
-
-    if (isset($form['field_type']['widget']['#options'])) {
-      foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
-        $tid = (int) $tid;
-
-        // Check if this term is enabled.
-        if (in_array($tid, $enabled, TRUE)) {
+    if ($is_optgroup) {
+      // Optgroup structure: filter within each group.
+      foreach ($form['field_type']['widget']['#options'] as $group_label => &$group_options) {
+        if (!is_array($group_options)) {
           continue;
         }
-
-        // Check if this is a parent with enabled children.
-        // If the parent itself isn't enabled but some of its children are,
-        // we still need to show the parent in the dropdown (Drupal requires
-        // the parent optgroup for children to appear).
-        if (isset($parent_children[$tid])) {
+        foreach ($group_options as $tid => $label) {
+          $tid = (int) $tid;
+          if (!in_array($tid, $enabled, TRUE)) {
+            unset($group_options[$tid]);
+          }
+        }
+        // Remove empty groups.
+        if (empty($group_options)) {
+          unset($form['field_type']['widget']['#options'][$group_label]);
+        }
+      }
+    }
+    else {
+      // Flat structure: filter directly.
+      foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
+        $tid_int = (int) $tid;
+        if (in_array($tid_int, $enabled, TRUE)) {
+          continue;
+        }
+        // Keep parent if it has enabled children.
+        if (isset($parent_children[$tid_int])) {
           $has_enabled_child = FALSE;
-          foreach ($parent_children[$tid] as $child_tid) {
+          foreach ($parent_children[$tid_int] as $child_tid) {
             if (in_array($child_tid, $enabled, TRUE)) {
               $has_enabled_child = TRUE;
               break;
@@ -81,8 +123,6 @@ function laci_indiana_form_alter(array &$form, \Drupal\Core\Form\FormStateInterf
             continue;
           }
         }
-
-        // Remove this option.
         unset($form['field_type']['widget']['#options'][$tid]);
       }
     }
