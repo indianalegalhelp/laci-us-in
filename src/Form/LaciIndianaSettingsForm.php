@@ -64,7 +64,7 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
 
     $options = [];
     foreach ($terms as $term) {
-      $options[$term->id()] = $term->label();
+      $options[$term->tid] = $term->name;
     }
 
     $form['enabled_authority_types'] = [
