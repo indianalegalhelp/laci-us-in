@@ -1,0 +1,131 @@
+/**
+ * @file
+ * LACI Help Sidebar styles.
+ * Matches Olivero theme design language.
+ */
+
+.laci-help-sidebar {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #232429;
+}
+
+.laci-help-sidebar__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #0dcaf0;
+  color: #0d7ab8;
+}
+
+.laci-help-sidebar__section {
+  margin-bottom: 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.laci-help-sidebar__summary {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.laci-help-sidebar__summary::-webkit-details-marker {
+  display: none;
+}
+
+.laci-help-sidebar__summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  margin-right: 0.25em;
+  transition: transform 0.15s ease;
+  color: #0d7ab8;
+}
+
+.laci-help-sidebar__section[open] > .laci-help-sidebar__summary::before {
+  transform: rotate(90deg);
+}
+
+.laci-help-sidebar__summary:hover {
+  background-color: #f0f9ff;
+}
+
+.laci-help-sidebar__content {
+  padding: 0.5rem 0.75rem 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.laci-help-sidebar__content p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+}
+
+.laci-help-sidebar__content ol,
+.laci-help-sidebar__content ul {
+  margin: 0.25rem 0 0.5rem 1.25rem;
+  padding: 0;
+  font-size: 0.8125rem;
+}
+
+.laci-help-sidebar__content li {
+  margin-bottom: 0.25rem;
+}
+
+.laci-help-sidebar__content ul ul {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.laci-help-sidebar__content a {
+  color: #0d7ab8;
+  text-decoration: none;
+}
+
+.laci-help-sidebar__content a:hover {
+  text-decoration: underline;
+}
+
+.laci-help-sidebar__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  margin: 0.25rem 0;
+}
+
+.laci-help-sidebar__table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.25rem 0.375rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #555;
+}
+
+.laci-help-sidebar__table td {
+  padding: 0.25rem 0.375rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.laci-help-sidebar__links {
+  list-style: none;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.laci-help-sidebar__links li {
+  margin-bottom: 0.375rem;
+  padding-left: 0;
+}
+
+.laci-help-sidebar__links a::before {
+  content: "→";
+  margin-right: 0.375em;
+  color: #0d7ab8;
+  font-weight: 700;
+}

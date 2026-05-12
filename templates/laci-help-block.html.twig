@@ -1,0 +1,108 @@
+{#
+/**
+ * @file
+ * LACI Help Sidebar block template.
+ *
+ * Uses native HTML <details>/<summary> for accordion behavior.
+ * No JavaScript required.
+ */
+#}
+<div class="laci-help-sidebar">
+  <h2 class="laci-help-sidebar__title">LACI Help</h2>
+
+  <details class="laci-help-sidebar__section">
+    <summary class="laci-help-sidebar__summary">What is LACI?</summary>
+    <div class="laci-help-sidebar__content">
+      <p>LACI monitors legal authorities (statutes, court rules, administrative code) for changes. It fetches each authority's text on a schedule, compares it to the previous version, and alerts you when changes are detected.</p>
+      <ol>
+        <li>Add <strong>Authorities</strong> (e.g., IC 31-16-2-6)</li>
+        <li>Link them to <strong>Documents</strong></li>
+        <li>LACI checks on a schedule</li>
+        <li>Changes create <strong>Reviews</strong></li>
+        <li>Review &amp; dismiss or complete</li>
+      </ol>
+    </div>
+  </details>
+
+  <details class="laci-help-sidebar__section">
+    <summary class="laci-help-sidebar__summary">Adding Authorities</summary>
+    <div class="laci-help-sidebar__content">
+      <ol>
+        <li>Click <a href="/node/add/authoritativesource">Create Authority</a></li>
+        <li>Fill in the form:
+          <ul>
+            <li><strong>Title</strong>: e.g., "IC 31-16-2-6"</li>
+            <li><strong>Authority Type</strong>: select from taxonomy</li>
+            <li><strong>Citation</strong>: e.g., "31-16-2-6"</li>
+            <li><strong>Section</strong>: used by the parser</li>
+            <li><strong>Check Frequency</strong>: Weekly (default)</li>
+          </ul>
+        </li>
+        <li>Save — LACI fetches text on next cron run</li>
+      </ol>
+    </div>
+  </details>
+
+  <details class="laci-help-sidebar__section">
+    <summary class="laci-help-sidebar__summary">Adding Documents</summary>
+    <div class="laci-help-sidebar__content">
+      <ol>
+        <li>Click <a href="/node/add/resource">Add Document</a></li>
+        <li>Fill in:
+          <ul>
+            <li><strong>Title</strong>: document name</li>
+            <li><strong>Document Link</strong>: URL or file</li>
+            <li><strong>Authorities</strong>: link one or more</li>
+          </ul>
+        </li>
+        <li>Save — document is now monitored</li>
+      </ol>
+    </div>
+  </details>
+
+  <details class="laci-help-sidebar__section">
+    <summary class="laci-help-sidebar__summary">Reviewing Changes</summary>
+    <div class="laci-help-sidebar__content">
+      <p>When LACI detects a change, it creates a <strong>Review</strong> with status "Pending".</p>
+      <ol>
+        <li>Go to <a href="/laci/all-documents">Documents</a> — pending reviews are highlighted</li>
+        <li>Click the document to see details</li>
+        <li><strong>Dismiss</strong>: change is not relevant</li>
+        <li><strong>Complete</strong>: document has been updated</li>
+      </ol>
+    </div>
+  </details>
+
+  <details class="laci-help-sidebar__section" open>
+    <summary class="laci-help-sidebar__summary">Citation Formats</summary>
+    <div class="laci-help-sidebar__content">
+      <table class="laci-help-sidebar__table">
+        <thead>
+          <tr><th>Type</th><th>Format</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Indiana Code</td><td>T-A-C-S</td><td>31-16-2-6</td></tr>
+          <tr><td>Trial Procedure</td><td>Rule #</td><td>1, 4.1</td></tr>
+          <tr><td>Evidence</td><td>Rule #</td><td>401, 502</td></tr>
+          <tr><td>Appellate</td><td>Rule #</td><td>5, 22</td></tr>
+          <tr><td>Criminal Proc.</td><td>Sub-rule</td><td>1-1, 2-3</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="laci-help-sidebar__section">
+    <summary class="laci-help-sidebar__summary">Quick Links</summary>
+    <div class="laci-help-sidebar__content">
+      <ul class="laci-help-sidebar__links">
+        <li><a href="/laci/all-authorities">All Authorities</a></li>
+        <li><a href="/laci/all-documents">All Documents</a></li>
+        <li><a href="/all-changes">All Changes</a></li>
+        <li><a href="/laci/authority-errors">Authority Errors</a></li>
+        <li><a href="/node/add/authoritativesource">Add Authority</a></li>
+        <li><a href="/node/add/resource">Add Document</a></li>
+        <li><a href="/admin/config/laci/indiana">IC Year Setting</a></li>
+      </ul>
+    </div>
+  </details>
+</div>
