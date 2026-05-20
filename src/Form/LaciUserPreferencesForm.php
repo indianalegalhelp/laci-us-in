@@ -201,10 +201,25 @@ class LaciUserPreferencesForm extends FormBase {
       return array_map('intval', $site_enabled);
     }
 
-    // Fallback: all terms provided by laci_indiana.
+    // Fallback: only terms installed by laci_indiana (not federal/other modules).
+    $default_terms_config = \Drupal::config('laci_indiana.authoritytype.default_terms');
+    $term_names = array_keys($default_terms_config->get('terms') ?: []);
+    // Also collect child term names.
+    foreach ($default_terms_config->get('terms') ?: [] as $parent_name => $parent_data) {
+      if (!empty($parent_data['children'])) {
+        $term_names = array_merge($term_names, array_keys($parent_data['children']));
+      }
+    }
+    // Resolve names to TIDs.
+    $tids = [];
     $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
       ->loadTree('authoritativesourcetype', 0, 2, FALSE);
-    return array_map(fn($t) => (int) $t->tid, $tree);
+    foreach ($tree as $term) {
+      if (in_array($term->name, $term_names, TRUE)) {
+        $tids[] = (int) $term->tid;
+      }
+    }
+    return $tids;
   }
 
 }

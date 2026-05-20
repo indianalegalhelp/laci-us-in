@@ -30,12 +30,11 @@ function laci_indiana_theme() {
 
 /**
  * Implements hook_form_alter().
+ *
+ * Note: Authority type filtering is handled by the more specific
+ * hook_form_FORM_ID_alter() implementations below, not here.
  */
 function laci_indiana_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state, string $form_id) {
-  // Filter the authority type dropdown on the Authority Source node form.
-  if ($form_id === 'node_authoritativesource_form' || $form_id === 'node_authoritativesource_edit_form') {
-    _laci_indiana_filter_authority_type_options($form);
-  }
 }
 
 /**
@@ -145,6 +144,9 @@ function _laci_indiana_filter_term_depth_options(array &$options) {
 
 /**
  * Filter authority type options based on per-user preferences.
+ *
+ * Also restructures flat options into optgroups so children are visually
+ * grouped under their parent type (e.g., Title 1-36 under "Indiana Code").
  */
 function _laci_indiana_filter_authority_type_options(array &$form) {
   $allowed = _laci_indiana_get_allowed_type_ids();
@@ -154,84 +156,123 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
   $prefs_url = \Drupal\Core\Url::fromRoute('laci_indiana.user_preferences', ['user' => $current_user->id()]);
   $form['field_type']['#suffix'] = '<div class="laci-edit-types-link"><a href="' . $prefs_url->toString() . '">' . t('Edit visible authority types') . '</a></div>';
 
-  if ($allowed === NULL) {
-    return;
-  }
-
   // Check field_type structure.
   if (!isset($form['field_type']['widget']['#options'])) {
     return;
   }
 
-  // Natural sort the options.
-  _laci_indiana_natural_sort_options($form['field_type']['widget']['#options']);
-
   // Load the taxonomy tree to determine parent-child relationships.
   $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
     ->loadTree('authoritativesourcetype', 0, 2, FALSE);
 
-  // Build a map: parent_tid => [child_tid, ...]
+  // Build maps: tid->name, tid->parent, parent->children.
+  $tid_name = [];
+  $tid_parent = [];
   $parent_children = [];
   foreach ($tree as $term) {
+    $tid_name[$term->tid] = $term->name;
     if ($term->depth > 0 && !empty($term->parents[0])) {
+      $tid_parent[$term->tid] = $term->parents[0];
       $parent_children[$term->parents[0]][$term->tid] = $term->tid;
     }
   }
 
-  if (isset($form['field_type']['widget']['#options'])) {
-    // Handle optgroup structure: options may be [parent_name => [tid => label, ...]]
-    // or flat [tid => label]. Check first non-_none key type.
-    $first_key = array_key_first($form['field_type']['widget']['#options']);
-    // Skip the "_none" placeholder to determine actual structure.
-    $check_key = $first_key;
-    if ($check_key === '_none') {
-      $keys = array_keys($form['field_type']['widget']['#options']);
-      $check_key = $keys[1] ?? NULL;
-    }
-    $is_optgroup = is_string($check_key) && !ctype_digit($check_key);
+  $options = &$form['field_type']['widget']['#options'];
 
-    if ($is_optgroup) {
-      // Optgroup structure: filter within each group.
-      foreach ($form['field_type']['widget']['#options'] as $group_label => &$group_options) {
-        if (!is_array($group_options)) {
-          continue;
-        }
-        foreach ($group_options as $tid => $label) {
-          $tid = (int) $tid;
-          if (!in_array($tid, $allowed, TRUE)) {
-            unset($group_options[$tid]);
+  // Step 1: Filter by allowed types.
+  if ($allowed !== NULL) {
+    foreach ($options as $key => $value) {
+      if ($key === '_none') {
+        continue;
+      }
+      $tid_int = (int) $key;
+      if (in_array($tid_int, $allowed, TRUE)) {
+        continue;
+      }
+      // Keep parent if it has enabled children.
+      if (isset($parent_children[$tid_int])) {
+        foreach ($parent_children[$tid_int] as $child_tid) {
+          if (in_array((int) $child_tid, $allowed, TRUE)) {
+            continue 2;
           }
-        }
-        // Remove empty groups.
-        if (empty($group_options)) {
-          unset($form['field_type']['widget']['#options'][$group_label]);
         }
       }
-    }
-    else {
-      // Flat structure: filter directly.
-      foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
-        $tid_int = (int) $tid;
-        if (in_array($tid_int, $allowed, TRUE)) {
-          continue;
-        }
-        // Keep parent if it has enabled children.
-        if (isset($parent_children[$tid_int])) {
-          $has_enabled_child = FALSE;
-          foreach ($parent_children[$tid_int] as $child_tid) {
-            if (in_array($child_tid, $allowed, TRUE)) {
-              $has_enabled_child = TRUE;
-              break;
-            }
-          }
-          if ($has_enabled_child) {
-            continue;
-          }
-        }
-        unset($form['field_type']['widget']['#options'][$tid]);
-      }
+      unset($options[$key]);
     }
   }
+
+  // Step 2: Improve labels and sort. Children get parent context in their label.
+  // Keeps flat format (entity reference widget doesn't support optgroups).
+  $new_options = [];
+  if (isset($options['_none'])) {
+    $new_options['_none'] = $options['_none'];
+    unset($options['_none']);
+  }
+
+  // Separate parents-with-children, their children, and standalone items.
+  $items = [];
+  foreach ($options as $tid => $label) {
+    $tid_int = (int) $tid;
+    if (isset($tid_parent[$tid_int])) {
+      // Child: show as "Parent → Child" with leading spaces for indent.
+      $parent_name = $tid_name[$tid_parent[$tid_int]] ?? '';
+      $clean_label = ltrim($label, '-');
+      $items[] = [
+        'tid' => $tid,
+        'label' => '  ' . $clean_label,
+        'parent_name' => $parent_name,
+        'is_child' => TRUE,
+        'sort_num' => preg_match('/Title\s+(\d+)/', $clean_label, $m) ? (int) $m[1] : 0,
+      ];
+    }
+    elseif (isset($parent_children[$tid_int])) {
+      // Parent with children: show as a section header label.
+      $items[] = [
+        'tid' => $tid,
+        'label' => '--- ' . $label . ' ---',
+        'parent_name' => $label,
+        'is_child' => FALSE,
+        'sort_num' => -1,
+      ];
+    }
+    else {
+      // Standalone type.
+      $items[] = [
+        'tid' => $tid,
+        'label' => $label,
+        'parent_name' => $label,
+        'is_child' => FALSE,
+        'sort_num' => 0,
+      ];
+    }
+  }
+
+  // Sort: group children under their parent, natural sort within groups.
+  usort($items, function ($a, $b) {
+    // First sort by parent name alphabetically.
+    $cmp = strnatcasecmp($a['parent_name'], $b['parent_name']);
+    if ($cmp !== 0) {
+      return $cmp;
+    }
+    // Within same parent: parent header first, then children by number.
+    if (!$a['is_child'] && $b['is_child']) {
+      return -1;
+    }
+    if ($a['is_child'] && !$b['is_child']) {
+      return 1;
+    }
+    // Both children: sort by number.
+    if ($a['sort_num'] !== $b['sort_num']) {
+      return $a['sort_num'] <=> $b['sort_num'];
+    }
+    return strnatcasecmp($a['label'], $b['label']);
+  });
+
+  foreach ($items as $item) {
+    $new_options[$item['tid']] = $item['label'];
+  }
+
+  $form['field_type']['widget']['#options'] = $new_options;
 }
 
 /**
