@@ -214,7 +214,7 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
   foreach ($options as $tid => $label) {
     $tid_int = (int) $tid;
     if (isset($tid_parent[$tid_int])) {
-      // Child: show as "Parent → Child" with leading spaces for indent.
+      // Child: show with leading spaces for indent.
       $parent_name = $tid_name[$tid_parent[$tid_int]] ?? '';
       $clean_label = ltrim($label, '-');
       $items[] = [
@@ -223,6 +223,7 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
         'parent_name' => $parent_name,
         'is_child' => TRUE,
         'sort_num' => preg_match('/Title\s+(\d+)/', $clean_label, $m) ? (int) $m[1] : 0,
+        'group_type' => 'child',
       ];
     }
     elseif (isset($parent_children[$tid_int])) {
@@ -233,6 +234,7 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
         'parent_name' => $label,
         'is_child' => FALSE,
         'sort_num' => -1,
+        'group_type' => 'parent',
       ];
     }
     else {
@@ -243,6 +245,7 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
         'parent_name' => $label,
         'is_child' => FALSE,
         'sort_num' => 0,
+        'group_type' => 'standalone',
       ];
     }
   }
@@ -268,11 +271,34 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
     return strnatcasecmp($a['label'], $b['label']);
   });
 
+  // Build final options with separator dividers between groups.
+  // Separators appear when transitioning between standalone items and
+  // parent-with-children groups (not between individual standalone items).
+  $sep_counter = 0;
+  $last_section = NULL; // 'standalone' or the parent_name of a group.
   foreach ($items as $item) {
+    // Determine which section this item belongs to.
+    if ($item['group_type'] === 'standalone') {
+      $current_section = 'standalone';
+    }
+    else {
+      // Both parent headers and children belong to the parent's section.
+      $current_section = $item['parent_name'];
+    }
+
+    // Insert separator when switching sections.
+    if ($last_section !== NULL && $current_section !== $last_section) {
+      $new_options['_sep_' . $sep_counter++] = '────────────';
+    }
     $new_options[$item['tid']] = $item['label'];
+    $last_section = $current_section;
   }
 
   $form['field_type']['widget']['#options'] = $new_options;
+
+  // Attach JS/CSS library for dropdown visual enhancement.
+  // The JS disables separator options and adds CSS classes for styling.
+  $form['#attached']['library'][] = 'laci_indiana/authority_type_select';
 }
 
 /**

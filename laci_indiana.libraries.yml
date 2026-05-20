@@ -17,3 +17,13 @@ help_sidebar:
   css:
     component:
       css/help-sidebar.css: {}
+
+authority_type_select:
+  version: VERSION
+  js:
+    js/authority-type-select.js: {}
+  css:
+    component:
+      css/authority-type-select.css: {}
+  dependencies:
+    - core/drupal
