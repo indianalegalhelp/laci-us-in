@@ -59,7 +59,7 @@ class IndianaDecisions extends AuthoritySourceBase {
    * {@inheritdoc}
    */
   public static function getPattern() : string {
-    return '.*';
+    return 'e.g. 23A-CR-00456 (case number or citation)';
   }
 
   /**

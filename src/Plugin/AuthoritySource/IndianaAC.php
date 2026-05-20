@@ -58,7 +58,7 @@ class IndianaAC extends AuthoritySourceBase {
    * {@inheritdoc}
    */
   public static function getPattern() : string {
-    return '[:digit:]+(-[:digit:]+){2,3}';
+    return 'e.g. 312-1-1-1 (format: Title-Article-Rule-Section)';
   }
 
   /**

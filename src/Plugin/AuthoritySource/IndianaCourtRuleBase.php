@@ -54,7 +54,7 @@ abstract class IndianaCourtRuleBase extends AuthoritySourceBase {
    * {@inheritdoc}
    */
   public static function getPattern() : string {
-    return '[:digit:]+(\\.[:digit:]+)?(-[:digit:]+)?';
+    return 'e.g. 56, 4.1, or 12(B) (Rule number, with optional sub-rule)';
   }
 
   /**

@@ -27,7 +27,7 @@ class GenericHtml extends AuthoritySourceBase {
   }
 
   public static function getPattern() : string {
-    return '.*';
+    return 'Any text identifier for this authority';
   }
 
   public static function getSectionLabel() : string {
