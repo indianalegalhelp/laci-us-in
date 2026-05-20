@@ -23,6 +23,16 @@ function laci_indiana_install() {
   $module_name = 'laci_indiana';
   $installer = \Drupal::service('laci_core.installer');
   $installer->importAuthorityTypes($module_name);
+
+  $configs = [
+    'laci_indiana.require_login.settings',
+  ];
+  $installer->replaceConfigs($configs);
+  $installer->createLoginPage('laci_indiana.login_page');
+
+  $config = \Drupal::configFactory()->getEditable('system.site');
+  $config->set('page.front', '/laci/all-authorities');
+  $config->save();
 }
 
 /**

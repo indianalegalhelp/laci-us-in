@@ -38,7 +38,7 @@ use Drupal\laci_core\Exception\AuthorityParseException;
  */
 #[AuthoritySource(
   id: 'laci_indiana:decisions',
-  rootName: 'laci_indiana_decisions',
+  rootName: 'laci_indiana_appellate_decisions',
   label: 'Indiana Appellate Decisions'
 )]
 class IndianaDecisions extends AuthoritySourceBase {

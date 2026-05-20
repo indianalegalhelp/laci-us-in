@@ -10,6 +10,7 @@
         }
     ],
     "require": {
-      "laci/laci_core": ">=1.8.3"
+      "laci/laci_core": ">=1.8.3",
+      "drupal/require_login": "^3.0"
     }
 }

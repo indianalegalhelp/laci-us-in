@@ -27,7 +27,7 @@ use Drupal\laci_core\Attribute\AuthoritySource;
  */
 #[AuthoritySource(
   id: 'laci_indiana:evidence',
-  rootName: 'laci_indiana_evidence',
+  rootName: 'laci_indiana_rules_of_evidence',
   label: 'Indiana Rules of Evidence'
 )]
 class IndianaEvidence extends IndianaCourtRuleBase {

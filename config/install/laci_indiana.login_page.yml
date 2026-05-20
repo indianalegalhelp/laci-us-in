@@ -11,13 +11,10 @@
 #
 # Copyright 2025-2026, Indiana Legal Help
 #
-name: LACI Indiana Parsers
-type: module
-license: AGPL-3.0-or-later
-description: "Parsers for Indiana Authorities: Indiana Code, IAC, Court Rules, and Appellate Decisions"
-version: 1.0.0
-core_version_requirement: ^10 || ^11
-package: LACI
-dependencies:
-  - laci_core:laci_core
-  - drupal:require_login
+title: 'Welcome to LACI Indiana'
+content:
+  value: '<h3>Sign in to L.A.C.I.</h3><h4>Legal Authority Citation Index &mdash; Indiana</h4><p>The Legal Authority Citation Index (LACI) helps legal aid organizations track changes in the laws and regulations that affect their client-facing content.</p><p>Please log in to continue.</p>'
+  format: basic_html
+path:
+  alias: '/laci/log-in-to-laci'
+  langcode: en
