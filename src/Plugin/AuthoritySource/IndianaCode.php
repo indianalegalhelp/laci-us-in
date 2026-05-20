@@ -52,7 +52,7 @@ class IndianaCode extends AuthoritySourceBase {
    * {@inheritdoc}
    */
   public static function getPattern() : string {
-    return '[:digit:]+(-[:digit:]+(\\.[:digit:]+)?){2,3}(-[:digit:]+(\\.[:digit:]+)?)?';
+    return 'e.g. 31-16-2-6 (format: Title-Article-Chapter-Section)';
   }
 
   /**

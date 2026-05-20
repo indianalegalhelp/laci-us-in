@@ -1,0 +1,5 @@
+laci_indiana.user_preferences:
+  route_name: laci_indiana.user_preferences
+  title: 'Authority Preferences'
+  base_route: entity.user.canonical
+  weight: 50

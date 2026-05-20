@@ -65,20 +65,18 @@ function laci_indiana_form_node_authoritativesource_edit_form_alter(array &$form
 }
 
 /**
- * Get the list of allowed authority type term IDs based on config.
+ * Get the list of allowed authority type term IDs based on per-user prefs.
  *
  * @return int[]|null
  *   Array of allowed term IDs, or NULL if filtering is disabled.
  */
 function _laci_indiana_get_allowed_type_ids() {
-  $config = \Drupal::config('laci_indiana.settings');
-  $enabled = $config->get('enabled_authority_types');
+  $account = \Drupal::currentUser();
+  $enabled = \Drupal\laci_indiana\Form\LaciUserPreferencesForm::getUserEnabledTypes($account);
 
   if (empty($enabled)) {
     return NULL;
   }
-
-  $enabled = array_map('intval', $enabled);
 
   // Also include parent term IDs that have enabled children.
   $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
@@ -93,7 +91,7 @@ function _laci_indiana_get_allowed_type_ids() {
   foreach ($parent_children as $parent_tid => $children) {
     foreach ($children as $child_tid) {
       if (in_array($child_tid, $allowed, TRUE)) {
-        $allowed[] = $parent_tid;
+        $allowed[] = (int) $parent_tid;
         break;
       }
     }
@@ -146,10 +144,16 @@ function _laci_indiana_filter_term_depth_options(array &$options) {
 }
 
 /**
- * Filter authority type options based on enabled_authority_types config.
+ * Filter authority type options based on per-user preferences.
  */
 function _laci_indiana_filter_authority_type_options(array &$form) {
   $allowed = _laci_indiana_get_allowed_type_ids();
+
+  // Add "Edit visible types" link below the field_type widget.
+  $current_user = \Drupal::currentUser();
+  $prefs_url = \Drupal\Core\Url::fromRoute('laci_indiana.user_preferences', ['user' => $current_user->id()]);
+  $form['field_type']['#suffix'] = '<div class="laci-edit-types-link"><a href="' . $prefs_url->toString() . '">' . t('Edit visible authority types') . '</a></div>';
+
   if ($allowed === NULL) {
     return;
   }
@@ -158,6 +162,9 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
   if (!isset($form['field_type']['widget']['#options'])) {
     return;
   }
+
+  // Natural sort the options.
+  _laci_indiana_natural_sort_options($form['field_type']['widget']['#options']);
 
   // Load the taxonomy tree to determine parent-child relationships.
   $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
@@ -224,5 +231,56 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
         unset($form['field_type']['widget']['#options'][$tid]);
       }
     }
+  }
+}
+
+/**
+ * Natural sort an options array so numbered items sort numerically.
+ *
+ * Handles both flat arrays and arrays with a leading '_none' key.
+ * Sorts "Title 1" before "Title 10", and parent types alphabetically.
+ */
+function _laci_indiana_natural_sort_options(array &$options) {
+  // Preserve _none at the top.
+  $none = NULL;
+  if (isset($options['_none'])) {
+    $none = $options['_none'];
+    unset($options['_none']);
+  }
+
+  // Sort using natural comparison with numeric prefix priority.
+  uasort($options, function ($a, $b) {
+    // Handle string labels or nested arrays.
+    $label_a = is_string($a) ? $a : (is_array($a) ? reset($a) : (string) $a);
+    $label_b = is_string($b) ? $b : (is_array($b) ? reset($b) : (string) $b);
+
+    // Items starting with "-" are children (indented), group them after
+    // their parent by stripping the prefix for comparison.
+    $is_child_a = str_starts_with($label_a, '-');
+    $is_child_b = str_starts_with($label_b, '-');
+
+    // Extract "Title N" pattern for numeric sort.
+    $has_title_a = preg_match('/Title\s+(\d+)/', $label_a, $ma);
+    $has_title_b = preg_match('/Title\s+(\d+)/', $label_b, $mb);
+
+    // Title items sort among themselves numerically.
+    if ($has_title_a && $has_title_b) {
+      return (int) $ma[1] <=> (int) $mb[1];
+    }
+
+    // Title items sort after non-title items within the same group.
+    if ($has_title_a && !$has_title_b) {
+      return $is_child_b ? -1 : 1;
+    }
+    if (!$has_title_a && $has_title_b) {
+      return $is_child_a ? 1 : -1;
+    }
+
+    return strnatcasecmp($label_a, $label_b);
+  });
+
+  // Restore _none at the top.
+  if ($none !== NULL) {
+    $options = ['_none' => $none] + $options;
   }
 }
