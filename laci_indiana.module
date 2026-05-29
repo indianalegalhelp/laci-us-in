@@ -347,9 +347,14 @@ function _laci_indiana_inject_child_section_info(array &$form) {
 function _laci_indiana_fix_modal_buttons(array &$form) {
   $route_name = \Drupal::routeMatch()->getRouteName();
 
-  // Fix Test Authority button: prevent form validation from clearing fields.
+  // Fix Test Authority button: allow values for fields the test callback
+  // needs, but skip full validation so the form isn't cleared on errors.
   if (isset($form['actions']['test_button'])) {
-    $form['actions']['test_button']['#limit_validation_errors'] = [];
+    $form['actions']['test_button']['#limit_validation_errors'] = [
+      ['field_type'],
+      ['field_section'],
+      ['field_selector'],
+    ];
   }
 
   // Only apply modal-specific fixes when rendered inside the modal route.
@@ -361,6 +366,10 @@ function _laci_indiana_fix_modal_buttons(array &$form) {
   if (isset($form['actions']['submit']) && ($form['actions']['submit']['#name'] ?? '') === 'test') {
     $form['actions']['submit']['#name'] = 'modal_save';
   }
+
+  // Attach the section label JS — laci_core only attaches it on node.add
+  // and entity.node.edit_form routes, not on the modal controller route.
+  $form['#attached']['library'][] = 'laci_core/authoritysectionlabel_js';
 }
 
 /**
