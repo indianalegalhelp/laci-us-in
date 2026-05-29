@@ -54,6 +54,8 @@ function laci_indiana_form_views_exposed_form_alter(array &$form, \Drupal\Core\F
  */
 function laci_indiana_form_node_authoritativesource_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
   _laci_indiana_filter_authority_type_options($form);
+  _laci_indiana_inject_child_section_info($form);
+  _laci_indiana_fix_modal_buttons($form);
 }
 
 /**
@@ -299,6 +301,66 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
   // Attach JS/CSS library for dropdown visual enhancement.
   // The JS disables separator options and adds CSS classes for styling.
   $form['#attached']['library'][] = 'laci_indiana/authority_type_select';
+}
+
+/**
+ * Inject sectionInfo drupalSettings for child taxonomy terms.
+ *
+ * laci_core's getAuthoritySourceLabels() only includes top-level terms.
+ * Child terms (e.g., "Title 1 - General Provisions") have no sectionInfo
+ * entry, so no tip is shown when selected. This function maps child TIDs
+ * to their parent's plugin tip.
+ */
+function _laci_indiana_inject_child_section_info(array &$form) {
+  $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
+    ->loadTree('authoritativesourcetype', 0, 2, FALSE);
+
+  // Build parent→children map and identify parent TIDs.
+  $child_to_parent = [];
+  $parent_tids = [];
+  foreach ($tree as $term) {
+    if ($term->depth == 0) {
+      $parent_tids[$term->tid] = $term->tid;
+    }
+    elseif (!empty($term->parents[0])) {
+      $child_to_parent[$term->tid] = $term->parents[0];
+    }
+  }
+
+  // Get existing sectionInfo (already set by laci_core's AuthorityHooks).
+  $existing = $form['#attached']['drupalSettings']['sectionInfo'] ?? [];
+
+  // For each child term, copy the parent's sectionInfo entry.
+  foreach ($child_to_parent as $child_tid => $parent_tid) {
+    if (!isset($existing[$child_tid]) && isset($existing[$parent_tid])) {
+      $form['#attached']['drupalSettings']['sectionInfo'][$child_tid] = $existing[$parent_tid];
+    }
+  }
+}
+
+/**
+ * Fix modal-specific button issues for the Add Authority dialog.
+ *
+ * 1. Fix Save button #name collision ('test' → 'modal_save').
+ * 2. Add #limit_validation_errors to Test button so it doesn't clear the form.
+ */
+function _laci_indiana_fix_modal_buttons(array &$form) {
+  $route_name = \Drupal::routeMatch()->getRouteName();
+
+  // Fix Test Authority button: prevent form validation from clearing fields.
+  if (isset($form['actions']['test_button'])) {
+    $form['actions']['test_button']['#limit_validation_errors'] = [];
+  }
+
+  // Only apply modal-specific fixes when rendered inside the modal route.
+  if ($route_name !== 'laci_add_authority_modal.modal') {
+    return;
+  }
+
+  // Fix the Save button's #name collision with the Test button.
+  if (isset($form['actions']['submit']) && ($form['actions']['submit']['#name'] ?? '') === 'test') {
+    $form['actions']['submit']['#name'] = 'modal_save';
+  }
 }
 
 /**
