@@ -52,7 +52,7 @@ class IndianaCode extends AuthoritySourceBase {
    * {@inheritdoc}
    */
   public static function getPattern() : string {
-    return '[:digit:]+(-[:digit:]+(\\.[:digit:]+)?){2,3}(-[:digit:]+(\\.[:digit:]+)?)?';
+    return 'e.g. 31-16-2-6 (format: Title-Article-Chapter-Section)';
   }
 
   /**
@@ -64,14 +64,37 @@ class IndianaCode extends AuthoritySourceBase {
     $year = $this->getYear();
 
     $url = self::BASE_URL . "/{$year}/Title_{$title}.html";
-    $html = $this->getWebData($url, [
-      'headers' => [
-        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept-Encoding' => 'gzip, deflate',
+    $html = $this->fetchTitleHtml($url);
+
+    return $this->extractSection($html, $section);
+  }
+
+  /**
+   * Fetches title HTML with Accept-Encoding to satisfy CloudFront,
+   * then decompresses the response.
+   */
+  private function fetchTitleHtml(string $url) : string {
+    $context = stream_context_create([
+      'http' => [
+        'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36\r\nAccept-Encoding: gzip, deflate\r\n",
+        'timeout' => 30,
+      ],
+      'ssl' => [
+        'verify_peer' => TRUE,
       ],
     ]);
 
-    return $this->extractSection($html, $section);
+    $compressed = file_get_contents($url, FALSE, $context);
+    if ($compressed === FALSE) {
+      throw new AuthorityParseException("Failed to fetch $url");
+    }
+
+    $html = @gzdecode($compressed);
+    if ($html === FALSE) {
+      $html = $compressed;
+    }
+
+    return $html;
   }
 
   /**
