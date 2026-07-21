@@ -26,6 +26,17 @@ function laci_indiana_install() {
 }
 
 /**
+ * Implements hook_update_N().
+ *
+ * Adds the 'Indiana Rules on Access to Court Records' authority type term.
+ */
+function laci_indiana_update_10001() {
+  $installer = \Drupal::service('laci_core.installer');
+  $installer->importAuthorityTypes('laci_indiana');
+  return t('Imported the Indiana Rules on Access to Court Records authority type.');
+}
+
+/**
  * Implements hook_uninstall().
  */
 function laci_indiana_uninstall() {

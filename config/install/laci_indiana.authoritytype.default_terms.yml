@@ -96,6 +96,9 @@ terms:
   'Indiana Rules of Criminal Procedure':
     children: {  }
     description: null
+  'Indiana Rules on Access to Court Records':
+    children: {  }
+    description: null
   'Indiana Appellate Decisions':
     children: {  }
     description: null
