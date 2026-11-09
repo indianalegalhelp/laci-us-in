@@ -84,21 +84,61 @@ terms:
   'Indiana Administrative Code':
     children: {  }
     description: ''
-  'Indiana Rules of Trial Procedure':
-    children: {  }
-    description: null
-  'Indiana Rules of Evidence':
-    children: {  }
-    description: null
-  'Indiana Rules of Appellate Procedure':
-    children: {  }
-    description: null
-  'Indiana Rules of Criminal Procedure':
-    children: {  }
-    description: null
-  'Indiana Rules on Access to Court Records':
-    children: {  }
-    description: null
+  # One parser (IndianaCourtRules) covers every rule set on rules.incourts.gov.
+  # Each child's description MUST hold the set's URL; the parser reads the set
+  # from it. Child names must not equal any other term name in this vocabulary
+  # (LaciInstaller::addTerm matches on name alone).
+  'Indiana Court Rules':
+    children:
+      'Indiana Access to Court Records Rules':
+        description: 'https://rules.incourts.gov/Content/records/'
+      'Indiana Administrative Rules':
+        description: 'https://rules.incourts.gov/Content/admin/'
+      'Indiana Admission and Discipline Rules':
+        description: 'https://rules.incourts.gov/Content/admission-discipline/'
+      'Indiana Alcohol & Drug Programs Rules':
+        description: 'https://rules.incourts.gov/Content/alcohol-drug/'
+      'Indiana Alternative Dispute Resolution Rules':
+        description: 'https://rules.incourts.gov/Content/adr/'
+      'Indiana Appellate Rules':
+        description: 'https://rules.incourts.gov/Content/appellate/'
+      'Indiana Child Support Guidelines':
+        description: 'https://rules.incourts.gov/Content/child-support/'
+      'Indiana Commercial Court Rules':
+        description: 'https://rules.incourts.gov/Content/commercial/'
+      'Indiana Criminal Rules':
+        description: 'https://rules.incourts.gov/Content/criminal/'
+      'Indiana Evidence Rules':
+        description: 'https://rules.incourts.gov/Content/evidence/'
+      'Indiana Guardian Ad Litem Guidelines':
+        description: 'https://rules.incourts.gov/Content/gal/'
+      'Indiana Interpreter Code of Conduct':
+        description: 'https://rules.incourts.gov/Content/interpreter/'
+      'Indiana Judicial Conduct Rules':
+        description: 'https://rules.incourts.gov/Content/judicial-conduct/'
+      'Indiana Jury Rules':
+        description: 'https://rules.incourts.gov/Content/jury/'
+      'Indiana Original Actions Rules':
+        description: 'https://rules.incourts.gov/Content/original-actions/'
+      'Indiana Parenting Time Guidelines':
+        description: 'https://rules.incourts.gov/Content/parenting/'
+      'Indiana Post-Conviction Remedies Rules':
+        description: 'https://rules.incourts.gov/Content/post-conviction/'
+      'Indiana Pretrial Services Rules':
+        description: 'https://rules.incourts.gov/Content/pretrial/'
+      'Indiana Problem-Solving Court Rules':
+        description: 'https://rules.incourts.gov/Content/problem-solving/'
+      'Indiana Professional Conduct Rules':
+        description: 'https://rules.incourts.gov/Content/prof-conduct/'
+      'Indiana Small Claims Rules':
+        description: 'https://rules.incourts.gov/Content/small-claims/'
+      'Indiana Tax Court Rules':
+        description: 'https://rules.incourts.gov/Content/tax/'
+      'Indiana Trial De Novo Rules':
+        description: 'https://rules.incourts.gov/Content/trial-denovo/'
+      'Indiana Trial Rules':
+        description: 'https://rules.incourts.gov/Content/trial/'
+    description: 'Every rule set published at https://rules.incourts.gov/Content/. Pick a specific set below.'
   'Indiana Appellate Decisions':
     children: {  }
     description: null
