@@ -47,6 +47,24 @@ function laci_indiana_update_10001() {
  * transaction; if the before/after counts disagree, it all rolls back.
  */
 function laci_indiana_update_10002() {
+  // LaciInstaller reads term lists from ACTIVE config, which is only copied
+  // from config/install when the module is first installed. Merge the new
+  // "Indiana Court Rules" entry in from the file, drop the five old court-rule
+  // entries, and leave everything else in active config as it is.
+  $config_name = 'laci_indiana.authoritytype.default_terms';
+  $path = \Drupal::service('extension.list.module')->getPath('laci_indiana') . '/config/install';
+  $file_data = (new \Drupal\Core\Config\FileStorage($path))->read($config_name);
+  if (empty($file_data['terms']['Indiana Court Rules'])) {
+    throw new \Drupal\Core\Utility\UpdateException("Could not read \"Indiana Court Rules\" from $path/$config_name.yml; nothing was changed.");
+  }
+  $active = \Drupal::configFactory()->getEditable($config_name);
+  $terms = $active->get('terms') ?: [];
+  foreach (['Indiana Rules of Trial Procedure', 'Indiana Rules of Evidence', 'Indiana Rules of Appellate Procedure', 'Indiana Rules of Criminal Procedure', 'Indiana Rules on Access to Court Records'] as $old_name) {
+    unset($terms[$old_name]);
+  }
+  $terms['Indiana Court Rules'] = $file_data['terms']['Indiana Court Rules'];
+  $active->set('terms', $terms)->save();
+
   $installer = \Drupal::service('laci_core.installer');
   $installer->importAuthorityTypes('laci_indiana');
 
