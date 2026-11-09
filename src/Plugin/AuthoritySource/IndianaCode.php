@@ -93,7 +93,7 @@ class IndianaCode extends AuthoritySourceBase {
     if (preg_match('/^\d{4}$/', $setting)) {
       $html = $this->fetchTitleHtml($this->titleUrl($setting, $title));
       if (!self::isPublishedEdition($html)) {
-        throw new AuthorityParseException("The {$setting} edition of Indiana Code Title {$title} is not published at " . $this->titleUrl($setting, $title) . ". The Indiana Code year setting is pinned to {$setting}; set it to \"auto\" or an earlier year.");
+        $this->fail($this->titleUrl($setting, $title), "The {$setting} edition of Indiana Code Title {$title} is not published at " . $this->titleUrl($setting, $title) . ". The Indiana Code year setting is pinned to {$setting}; set it to \"auto\" or an earlier year.");
       }
       return [$setting, $html];
     }
@@ -105,7 +105,7 @@ class IndianaCode extends AuthoritySourceBase {
         return [(string) $year, $html];
       }
     }
-    throw new AuthorityParseException("No published edition of Indiana Code Title {$title} found for {$current} or " . ($current - 1) . ".");
+    $this->fail($this->titleUrl((string) $current, $title), "No published edition of Indiana Code Title {$title} found for {$current} or " . ($current - 1) . ".");
   }
 
   /**
@@ -143,7 +143,8 @@ class IndianaCode extends AuthoritySourceBase {
 
     $previous = (string) ((int) $year - 1);
     try {
-      $old = $this->fetchTitleHtml($this->titleUrl($previous, $title));
+      // Quiet fetch: a failure here must not record a second, misleading error.
+      $old = $this->fetchTitleHtml($this->titleUrl($previous, $title), FALSE);
       if (self::isPublishedEdition($old) && $this->hasSection($old, $section)) {
         $message .= " It was in the {$previous} edition, so it was most likely REPEALED OR RENUMBERED. Review the documents that cite it.";
       }
@@ -160,6 +161,20 @@ class IndianaCode extends AuthoritySourceBase {
       $message .= " Chapter note: \"{$note}\"";
     }
 
+    $this->fail($this->titleUrl($year, $title), $message);
+  }
+
+  /**
+   * Records the failure where people will see it, then throws.
+   *
+   * LACI core (1.10) only turns an AuthorityParseException into a log line;
+   * the Error History and the Authority Errors page are fed by AuthorityError
+   * records, which core creates only inside its own web fetcher. This parser
+   * uses its own fetcher (IGA needs gzip handling), so it records the error
+   * itself, the same way core does.
+   */
+  private function fail(string $url, string $message, bool $isConnectionError = FALSE) : never {
+    $this->createAuthorityError($url, NULL, $isConnectionError, $message);
     throw new AuthorityParseException($message);
   }
 
@@ -193,13 +208,19 @@ class IndianaCode extends AuthoritySourceBase {
    * Fetches title HTML with Accept-Encoding to satisfy CloudFront,
    * then decompresses the response.
    */
-  private function fetchTitleHtml(string $url) : string {
+  private function fetchTitleHtml(string $url, bool $recordErrors = TRUE) : string {
     // Titles are large (Title 31 is ~6 MB) and one cron run checks many
     // sections of the same title. Keep the last few pages for this request.
     if (isset(self::$pages[$url])) {
       return self::$pages[$url];
     }
     $html = $this->downloadTitleHtml($url);
+    if ($html === NULL) {
+      if ($recordErrors) {
+        $this->fail($url, "Failed to fetch $url", TRUE);
+      }
+      throw new AuthorityParseException("Failed to fetch $url");
+    }
     self::$pages[$url] = $html;
     if (count(self::$pages) > 4) {
       array_shift(self::$pages);
@@ -213,9 +234,9 @@ class IndianaCode extends AuthoritySourceBase {
   private static array $pages = [];
 
   /**
-   * Downloads one title page (no memo).
+   * Downloads one title page (no memo). NULL on failure.
    */
-  private function downloadTitleHtml(string $url) : string {
+  private function downloadTitleHtml(string $url) : ?string {
     $context = stream_context_create([
       'http' => [
         'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36\r\nAccept-Encoding: gzip, deflate\r\n",
@@ -228,7 +249,7 @@ class IndianaCode extends AuthoritySourceBase {
 
     $compressed = file_get_contents($url, FALSE, $context);
     if ($compressed === FALSE) {
-      throw new AuthorityParseException("Failed to fetch $url");
+      return NULL;
     }
 
     $html = @gzdecode($compressed);
