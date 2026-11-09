@@ -5,3 +5,16 @@ laci_indiana.settings:
     _title: 'LACI Indiana settings'
   requirements:
     _permission: 'administer site configuration'
+
+laci_indiana.user_preferences:
+  path: '/user/{user}/laci-preferences'
+  defaults:
+    _form: '\Drupal\laci_indiana\Form\LaciUserPreferencesForm'
+    _title: 'Authority Type Preferences'
+  requirements:
+    _permission: 'access content'
+    user: \d+
+  options:
+    parameters:
+      user:
+        type: entity:user

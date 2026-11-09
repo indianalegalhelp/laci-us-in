@@ -39,7 +39,7 @@ use Drupal\laci_core\Exception\AuthorityParseException;
  */
 #[AuthoritySource(
   id: 'laci_indiana:admin_code',
-  rootName: 'laci_indiana_admin_code',
+  rootName: 'laci_indiana_administrative_code',
   label: 'Indiana Administrative Code'
 )]
 class IndianaAC extends AuthoritySourceBase {
@@ -58,7 +58,7 @@ class IndianaAC extends AuthoritySourceBase {
    * {@inheritdoc}
    */
   public static function getPattern() : string {
-    return '[:digit:]+(-[:digit:]+){2,3}';
+    return 'e.g. 312-1-1-1 (format: Title-Article-Rule-Section)';
   }
 
   /**

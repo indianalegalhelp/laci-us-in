@@ -38,7 +38,7 @@ use Drupal\laci_core\Exception\AuthorityParseException;
  */
 #[AuthoritySource(
   id: 'laci_indiana:decisions',
-  rootName: 'laci_indiana_decisions',
+  rootName: 'laci_indiana_appellate_decisions',
   label: 'Indiana Appellate Decisions'
 )]
 class IndianaDecisions extends AuthoritySourceBase {
@@ -59,7 +59,7 @@ class IndianaDecisions extends AuthoritySourceBase {
    * {@inheritdoc}
    */
   public static function getPattern() : string {
-    return '.*';
+    return 'e.g. 23A-CR-00456 (case number or citation)';
   }
 
   /**

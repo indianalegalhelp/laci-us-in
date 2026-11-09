@@ -27,7 +27,7 @@ use Drupal\laci_core\Attribute\AuthoritySource;
  */
 #[AuthoritySource(
   id: 'laci_indiana:appellate',
-  rootName: 'laci_indiana_appellate',
+  rootName: 'laci_indiana_rules_of_appellate_procedure',
   label: 'Indiana Rules of Appellate Procedure'
 )]
 class IndianaAppellate extends IndianaCourtRuleBase {
