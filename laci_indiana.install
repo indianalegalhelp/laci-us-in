@@ -201,6 +201,24 @@ function laci_indiana_update_10002() {
 }
 
 /**
+ * Implements hook_update_N().
+ *
+ * Switches the Indiana Code year to "auto" (newest published edition), but
+ * only when it holds this year or last year, i.e. the value auto would pick
+ * anyway. A deliberate pin to any other year is left alone.
+ */
+function laci_indiana_update_10003() {
+  $config = \Drupal::configFactory()->getEditable('laci_indiana.settings');
+  $year = trim((string) $config->get('ic_year'));
+  $current = (int) date('Y');
+  if ($year === '' || $year === (string) $current || $year === (string) ($current - 1)) {
+    $config->set('ic_year', 'auto')->save();
+    return t('Indiana Code year: "@old" → "auto" (newest published edition).', ['@old' => $year === '' ? 'empty' : $year]);
+  }
+  return t('Indiana Code year left pinned at @year.', ['@year' => $year]);
+}
+
+/**
  * Implements hook_uninstall().
  */
 function laci_indiana_uninstall() {
