@@ -49,12 +49,12 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
     $form['ic_year'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Indiana Code year'),
-      '#description' => $this->t('The year to use when fetching Indiana Code HTML from IGA (e.g., 2025). This corresponds to the year in the URL pattern: iga.in.gov/ic/{year}/Title_{N}.html'),
-      '#default_value' => $config->get('ic_year') ?: '2025',
+      '#description' => $this->t('Leave as <strong>auto</strong> (recommended): LACI uses the newest edition IGA has published, trying this year first and then last year. IGA usually posts a new edition in late summer, and switching editions can open a batch of reviews. Enter a 4-digit year (e.g., 2026) only to pin one edition. URL pattern: iga.in.gov/ic/{year}/Title_{N}.html'),
+      '#default_value' => $config->get('ic_year') ?: 'auto',
       '#required' => TRUE,
       '#size' => 10,
       '#maxlength' => 4,
-      '#pattern' => '\d{4}',
+      '#pattern' => 'auto|\d{4}',
     ];
 
     // Load the full taxonomy tree (2 levels deep).
@@ -131,9 +131,10 @@ class LaciIndianaSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) : void {
-    $year = $form_state->getValue('ic_year');
-    if (!preg_match('/^\d{4}$/', $year)) {
-      $form_state->setErrorByName('ic_year', $this->t('Year must be a 4-digit number.'));
+    $year = strtolower(trim((string) $form_state->getValue('ic_year')));
+    $form_state->setValue('ic_year', $year);
+    if (!preg_match('/^(auto|\d{4})$/', $year)) {
+      $form_state->setErrorByName('ic_year', $this->t('Enter "auto" or a 4-digit year.'));
     }
   }
 
