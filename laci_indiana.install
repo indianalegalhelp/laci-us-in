@@ -37,6 +37,170 @@ function laci_indiana_update_10001() {
 }
 
 /**
+ * Implements hook_update_N().
+ *
+ * Moves the five per-set court-rule types onto the single "Indiana Court
+ * Rules" type (one child per rule set), then retires the old types.
+ *
+ * Safe to re-run: terms are created only if missing, and a second run finds
+ * no Authorities left on the old types. Everything happens in one database
+ * transaction; if the before/after counts disagree, it all rolls back.
+ */
+function laci_indiana_update_10002() {
+  // LaciInstaller reads term lists from ACTIVE config, which is only copied
+  // from config/install when the module is first installed. Merge the new
+  // "Indiana Court Rules" entry in from the file, drop the five old court-rule
+  // entries, and leave everything else in active config as it is.
+  $config_name = 'laci_indiana.authoritytype.default_terms';
+  $path = \Drupal::service('extension.list.module')->getPath('laci_indiana') . '/config/install';
+  $file_data = (new \Drupal\Core\Config\FileStorage($path))->read($config_name);
+  if (empty($file_data['terms']['Indiana Court Rules'])) {
+    throw new \Drupal\Core\Utility\UpdateException("Could not read \"Indiana Court Rules\" from $path/$config_name.yml; nothing was changed.");
+  }
+  $active = \Drupal::configFactory()->getEditable($config_name);
+  $terms = $active->get('terms') ?: [];
+  foreach (['Indiana Rules of Trial Procedure', 'Indiana Rules of Evidence', 'Indiana Rules of Appellate Procedure', 'Indiana Rules of Criminal Procedure', 'Indiana Rules on Access to Court Records'] as $old_name) {
+    unset($terms[$old_name]);
+  }
+  $terms['Indiana Court Rules'] = $file_data['terms']['Indiana Court Rules'];
+  $active->set('terms', $terms)->save();
+
+  $installer = \Drupal::service('laci_core.installer');
+  $installer->importAuthorityTypes('laci_indiana');
+
+  $etm = \Drupal::entityTypeManager();
+  $term_storage = $etm->getStorage('taxonomy_term');
+  $node_storage = $etm->getStorage('node');
+  $vid = 'authoritativesourcetype';
+
+  // The new parent and its children, keyed by rule-set slug.
+  $parents = $term_storage->loadByProperties(['vid' => $vid, 'name' => 'Indiana Court Rules']);
+  $parent = reset($parents);
+  if (!$parent) {
+    throw new \Drupal\Core\Utility\UpdateException('The "Indiana Court Rules" term was not created; nothing was changed.');
+  }
+  $new_by_slug = [];
+  foreach ($term_storage->loadChildren($parent->id(), $vid) as $child) {
+    $slug = \Drupal\laci_indiana\Plugin\AuthoritySource\IndianaCourtRules::slugFromTerm($child);
+    if ($slug) {
+      $new_by_slug[$slug] = (int) $child->id();
+    }
+  }
+
+  // Old root types and the rule set each one becomes.
+  $old_to_slug = [
+    'Indiana Rules of Trial Procedure' => 'trial',
+    'Indiana Rules of Evidence' => 'evidence',
+    'Indiana Rules of Appellate Procedure' => 'appellate',
+    'Indiana Rules of Criminal Procedure' => 'criminal',
+    'Indiana Rules on Access to Court Records' => 'records',
+  ];
+
+  $tid_map = [];
+  foreach ($old_to_slug as $old_name => $slug) {
+    $found = $term_storage->loadByProperties(['vid' => $vid, 'name' => $old_name]);
+    $old = reset($found);
+    if (!$old) {
+      continue;
+    }
+    if (empty($new_by_slug[$slug])) {
+      throw new \Drupal\Core\Utility\UpdateException("No new child term for rule set \"$slug\"; nothing was changed.");
+    }
+    $tid_map[(int) $old->id()] = $new_by_slug[$slug];
+  }
+
+  if (!$tid_map) {
+    return t('No old court-rule types found; nothing to move.');
+  }
+
+  $count_on = function (int $tid) use ($node_storage) : int {
+    return (int) $node_storage->getQuery()
+      ->condition('type', 'authoritativesource')
+      ->condition('field_type', $tid)
+      ->accessCheck(FALSE)
+      ->count()
+      ->execute();
+  };
+
+  $moved = 0;
+  $report = [];
+  $txn = \Drupal::database()->startTransaction();
+  try {
+    foreach ($tid_map as $old_tid => $new_tid) {
+      $expected = $count_on($old_tid) + $count_on($new_tid);
+      $nids = $node_storage->getQuery()
+        ->condition('type', 'authoritativesource')
+        ->condition('field_type', $old_tid)
+        ->accessCheck(FALSE)
+        ->execute();
+      foreach ($node_storage->loadMultiple($nids) as $node) {
+        // Section is kept as-is; the title is rebuilt on save from the new type.
+        $node->set('field_type', $new_tid);
+        $node->save();
+        $moved++;
+      }
+      $left = $count_on($old_tid);
+      $now = $count_on($new_tid);
+      if ($left !== 0 || $now !== $expected) {
+        throw new \Drupal\Core\Utility\UpdateException("Count mismatch moving term $old_tid to $new_tid: $left left behind, $now on new (expected $expected). Rolled back; nothing was changed.");
+      }
+      $report[] = count($nids) . " → tid $new_tid";
+    }
+
+    // Carry enabled-type choices over: the site default and each user's own.
+    $swap = function (array $tids) use ($tid_map, $parent) : array {
+      $out = [];
+      $hit = FALSE;
+      foreach ($tids as $tid) {
+        $tid = (int) $tid;
+        if (isset($tid_map[$tid])) {
+          $out[] = $tid_map[$tid];
+          $hit = TRUE;
+        }
+        else {
+          $out[] = $tid;
+        }
+      }
+      if ($hit) {
+        $out[] = (int) $parent->id();
+      }
+      return array_values(array_unique($out));
+    };
+
+    $config = \Drupal::configFactory()->getEditable('laci_indiana.settings');
+    $site = $config->get('enabled_authority_types');
+    if (is_array($site) && $site) {
+      $config->set('enabled_authority_types', $swap($site))->save();
+    }
+
+    $user_data = \Drupal::service('user.data');
+    $all = $user_data->get('laci_indiana', NULL, 'enabled_authority_types') ?: [];
+    foreach ($all as $uid => $tids) {
+      if (is_array($tids) && $tids) {
+        $user_data->set('laci_indiana', $uid, 'enabled_authority_types', $swap($tids));
+      }
+    }
+
+    // Retire the old types now that nothing points at them.
+    $term_storage->delete($term_storage->loadMultiple(array_keys($tid_map)));
+  }
+  catch (\Throwable $e) {
+    $txn->rollBack();
+    throw $e instanceof \Drupal\Core\Utility\UpdateException ? $e : new \Drupal\Core\Utility\UpdateException('Court rules migration failed and was rolled back: ' . $e->getMessage());
+  }
+  unset($txn);
+
+  // Parsers are chosen from cached plugin definitions; refresh them.
+  \Drupal::service('plugin.manager.laci_core.authority_source')->clearCachedDefinitions();
+
+  return t('Moved @n court-rule authorities onto "Indiana Court Rules" (@detail) and retired @t old types.', [
+    '@n' => $moved,
+    '@detail' => implode('; ', $report),
+    '@t' => count($tid_map),
+  ]);
+}
+
+/**
  * Implements hook_uninstall().
  */
 function laci_indiana_uninstall() {

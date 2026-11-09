@@ -1,0 +1,43 @@
+/**
+ * @file
+ * Styles for authority type dropdown visual grouping.
+ *
+ * This file is part of LACI.
+ * Copyright 2025-2026, Indiana Legal Help
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/* Separator rows between groups */
+select[name="field_type"] option.laci-separator {
+  font-size: 0.7em;
+  color: #999;
+  background: #f0f0f0;
+}
+
+/* Group header options (e.g., "--- Indiana Code ---") */
+select[name="field_type"] option.laci-group-header {
+  font-weight: bold;
+  background-color: #eef3f8;
+  color: #2c5282;
+}
+
+/* Child options (indented titles) */
+select[name="field_type"] option.laci-child-option {
+  padding-left: 1.5em;
+  color: #444;
+}
+
+/* Edit visible types link */
+.laci-edit-types-link {
+  margin-top: 0.3em;
+  font-size: 0.85em;
+}
+
+.laci-edit-types-link a {
+  color: #b45309;
+  text-decoration: underline;
+}
+
+.laci-edit-types-link a:hover {
+  color: #92400e;
+}

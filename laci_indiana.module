@@ -30,12 +30,11 @@ function laci_indiana_theme() {
 
 /**
  * Implements hook_form_alter().
+ *
+ * Note: Authority type filtering is handled by the more specific
+ * hook_form_FORM_ID_alter() implementations below, not here.
  */
 function laci_indiana_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state, string $form_id) {
-  // Filter the authority type dropdown on the Authority Source node form.
-  if ($form_id === 'node_authoritativesource_form' || $form_id === 'node_authoritativesource_edit_form') {
-    _laci_indiana_filter_authority_type_options($form);
-  }
 }
 
 /**
@@ -55,6 +54,8 @@ function laci_indiana_form_views_exposed_form_alter(array &$form, \Drupal\Core\F
  */
 function laci_indiana_form_node_authoritativesource_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
   _laci_indiana_filter_authority_type_options($form);
+  _laci_indiana_inject_child_section_info($form);
+  _laci_indiana_fix_modal_buttons($form);
 }
 
 /**
@@ -65,20 +66,18 @@ function laci_indiana_form_node_authoritativesource_edit_form_alter(array &$form
 }
 
 /**
- * Get the list of allowed authority type term IDs based on config.
+ * Get the list of allowed authority type term IDs based on per-user prefs.
  *
  * @return int[]|null
  *   Array of allowed term IDs, or NULL if filtering is disabled.
  */
 function _laci_indiana_get_allowed_type_ids() {
-  $config = \Drupal::config('laci_indiana.settings');
-  $enabled = $config->get('enabled_authority_types');
+  $account = \Drupal::currentUser();
+  $enabled = \Drupal\laci_indiana\Form\LaciUserPreferencesForm::getUserEnabledTypes($account);
 
   if (empty($enabled)) {
     return NULL;
   }
-
-  $enabled = array_map('intval', $enabled);
 
   // Also include parent term IDs that have enabled children.
   $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
@@ -93,7 +92,7 @@ function _laci_indiana_get_allowed_type_ids() {
   foreach ($parent_children as $parent_tid => $children) {
     foreach ($children as $child_tid) {
       if (in_array($child_tid, $allowed, TRUE)) {
-        $allowed[] = $parent_tid;
+        $allowed[] = (int) $parent_tid;
         break;
       }
     }
@@ -146,47 +145,18 @@ function _laci_indiana_filter_term_depth_options(array &$options) {
 }
 
 /**
- * Implements hook_views_query_alter().
- */
-function laci_indiana_views_query_alter(\Drupal\views\ViewExecutable $view, \Drupal\views\Plugin\views\query\QueryPluginBase $query) {
-  // Filter authority source views by enabled authority types.
-  $authority_views = [
-    'all_authorities',
-    'authorities_with_errors',
-    'all_documents',
-    'your_documents',
-    'authority_errors',
-  ];
-  if (!in_array($view->id(), $authority_views)) {
-    return;
-  }
-
-  $allowed = _laci_indiana_get_allowed_type_ids();
-  if ($allowed === NULL) {
-    return;
-  }
-
-  // Add a JOIN to node__field_type and a WHERE condition.
-  $configuration = [
-    'left_table' => 'node_field_data',
-    'left_field' => 'nid',
-    'field' => 'entity_id',
-    'table' => 'node__field_type',
-  ];
-  $join = \Drupal::service('plugin.manager.views.join')->createInstance('standard', $configuration);
-  $query->ensureTable('node__field_type', 'node_field_data', $join);
-
-  $query->addWhere('laci_indiana_filter', 'node__field_type.field_type_target_id', $allowed, 'IN');
-}
-
-/**
- * Filter authority type options based on enabled_authority_types config.
+ * Filter authority type options based on per-user preferences.
+ *
+ * Also restructures flat options into optgroups so children are visually
+ * grouped under their parent type (e.g., Title 1-36 under "Indiana Code").
  */
 function _laci_indiana_filter_authority_type_options(array &$form) {
   $allowed = _laci_indiana_get_allowed_type_ids();
-  if ($allowed === NULL) {
-    return;
-  }
+
+  // Add "Edit visible types" link below the field_type widget.
+  $current_user = \Drupal::currentUser();
+  $prefs_url = \Drupal\Core\Url::fromRoute('laci_indiana.user_preferences', ['user' => $current_user->id()]);
+  $form['field_type']['#suffix'] = '<div class="laci-edit-types-link"><a href="' . $prefs_url->toString() . '">' . t('Edit visible authority types') . '</a></div>';
 
   // Check field_type structure.
   if (!isset($form['field_type']['widget']['#options'])) {
@@ -197,66 +167,258 @@ function _laci_indiana_filter_authority_type_options(array &$form) {
   $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
     ->loadTree('authoritativesourcetype', 0, 2, FALSE);
 
-  // Build a map: parent_tid => [child_tid, ...]
+  // Build maps: tid->name, tid->parent, parent->children.
+  $tid_name = [];
+  $tid_parent = [];
   $parent_children = [];
   foreach ($tree as $term) {
+    $tid_name[$term->tid] = $term->name;
     if ($term->depth > 0 && !empty($term->parents[0])) {
+      $tid_parent[$term->tid] = $term->parents[0];
       $parent_children[$term->parents[0]][$term->tid] = $term->tid;
     }
   }
 
-  if (isset($form['field_type']['widget']['#options'])) {
-    // Handle optgroup structure: options may be [parent_name => [tid => label, ...]]
-    // or flat [tid => label]. Check first non-_none key type.
-    $first_key = array_key_first($form['field_type']['widget']['#options']);
-    // Skip the "_none" placeholder to determine actual structure.
-    $check_key = $first_key;
-    if ($check_key === '_none') {
-      $keys = array_keys($form['field_type']['widget']['#options']);
-      $check_key = $keys[1] ?? NULL;
-    }
-    $is_optgroup = is_string($check_key) && !ctype_digit($check_key);
+  $options = &$form['field_type']['widget']['#options'];
 
-    if ($is_optgroup) {
-      // Optgroup structure: filter within each group.
-      foreach ($form['field_type']['widget']['#options'] as $group_label => &$group_options) {
-        if (!is_array($group_options)) {
-          continue;
-        }
-        foreach ($group_options as $tid => $label) {
-          $tid = (int) $tid;
-          if (!in_array($tid, $allowed, TRUE)) {
-            unset($group_options[$tid]);
+  // Step 1: Filter by allowed types.
+  if ($allowed !== NULL) {
+    foreach ($options as $key => $value) {
+      if ($key === '_none') {
+        continue;
+      }
+      $tid_int = (int) $key;
+      if (in_array($tid_int, $allowed, TRUE)) {
+        continue;
+      }
+      // Keep parent if it has enabled children.
+      if (isset($parent_children[$tid_int])) {
+        foreach ($parent_children[$tid_int] as $child_tid) {
+          if (in_array((int) $child_tid, $allowed, TRUE)) {
+            continue 2;
           }
         }
-        // Remove empty groups.
-        if (empty($group_options)) {
-          unset($form['field_type']['widget']['#options'][$group_label]);
-        }
       }
+      unset($options[$key]);
+    }
+  }
+
+  // Step 2: Improve labels and sort. Children get parent context in their label.
+  // Keeps flat format (entity reference widget doesn't support optgroups).
+  $new_options = [];
+  if (isset($options['_none'])) {
+    $new_options['_none'] = $options['_none'];
+    unset($options['_none']);
+  }
+
+  // Separate parents-with-children, their children, and standalone items.
+  $items = [];
+  foreach ($options as $tid => $label) {
+    $tid_int = (int) $tid;
+    if (isset($tid_parent[$tid_int])) {
+      // Child: show with leading spaces for indent.
+      $parent_name = $tid_name[$tid_parent[$tid_int]] ?? '';
+      $clean_label = ltrim($label, '-');
+      $items[] = [
+        'tid' => $tid,
+        'label' => '  ' . $clean_label,
+        'parent_name' => $parent_name,
+        'is_child' => TRUE,
+        'sort_num' => preg_match('/Title\s+(\d+)/', $clean_label, $m) ? (int) $m[1] : 0,
+        'group_type' => 'child',
+      ];
+    }
+    elseif (isset($parent_children[$tid_int])) {
+      // Parent with children: show as a section header label.
+      $items[] = [
+        'tid' => $tid,
+        'label' => '--- ' . $label . ' ---',
+        'parent_name' => $label,
+        'is_child' => FALSE,
+        'sort_num' => -1,
+        'group_type' => 'parent',
+      ];
     }
     else {
-      // Flat structure: filter directly.
-      foreach ($form['field_type']['widget']['#options'] as $tid => $label) {
-        $tid_int = (int) $tid;
-        if (in_array($tid_int, $allowed, TRUE)) {
-          continue;
-        }
-        // Keep parent if it has enabled children.
-        if (isset($parent_children[$tid_int])) {
-          $has_enabled_child = FALSE;
-          foreach ($parent_children[$tid_int] as $child_tid) {
-            if (in_array($child_tid, $allowed, TRUE)) {
-              $has_enabled_child = TRUE;
-              break;
-            }
-          }
-          if ($has_enabled_child) {
-            continue;
-          }
-        }
-        unset($form['field_type']['widget']['#options'][$tid]);
-      }
+      // Standalone type.
+      $items[] = [
+        'tid' => $tid,
+        'label' => $label,
+        'parent_name' => $label,
+        'is_child' => FALSE,
+        'sort_num' => 0,
+        'group_type' => 'standalone',
+      ];
     }
+  }
+
+  // Sort: group children under their parent, natural sort within groups.
+  usort($items, function ($a, $b) {
+    // First sort by parent name alphabetically.
+    $cmp = strnatcasecmp($a['parent_name'], $b['parent_name']);
+    if ($cmp !== 0) {
+      return $cmp;
+    }
+    // Within same parent: parent header first, then children by number.
+    if (!$a['is_child'] && $b['is_child']) {
+      return -1;
+    }
+    if ($a['is_child'] && !$b['is_child']) {
+      return 1;
+    }
+    // Both children: sort by number.
+    if ($a['sort_num'] !== $b['sort_num']) {
+      return $a['sort_num'] <=> $b['sort_num'];
+    }
+    return strnatcasecmp($a['label'], $b['label']);
+  });
+
+  // Build final options with separator dividers between groups.
+  // Separators appear when transitioning between standalone items and
+  // parent-with-children groups (not between individual standalone items).
+  $sep_counter = 0;
+  $last_section = NULL; // 'standalone' or the parent_name of a group.
+  foreach ($items as $item) {
+    // Determine which section this item belongs to.
+    if ($item['group_type'] === 'standalone') {
+      $current_section = 'standalone';
+    }
+    else {
+      // Both parent headers and children belong to the parent's section.
+      $current_section = $item['parent_name'];
+    }
+
+    // Insert separator when switching sections.
+    if ($last_section !== NULL && $current_section !== $last_section) {
+      $new_options['_sep_' . $sep_counter++] = '────────────';
+    }
+    $new_options[$item['tid']] = $item['label'];
+    $last_section = $current_section;
+  }
+
+  $form['field_type']['widget']['#options'] = $new_options;
+
+  // Attach JS/CSS library for dropdown visual enhancement.
+  // The JS disables separator options and adds CSS classes for styling.
+  $form['#attached']['library'][] = 'laci_indiana/authority_type_select';
+}
+
+/**
+ * Inject sectionInfo drupalSettings for child taxonomy terms.
+ *
+ * laci_core's getAuthoritySourceLabels() only includes top-level terms.
+ * Child terms (e.g., "Title 1 - General Provisions") have no sectionInfo
+ * entry, so no tip is shown when selected. This function maps child TIDs
+ * to their parent's plugin tip.
+ */
+function _laci_indiana_inject_child_section_info(array &$form) {
+  $tree = \Drupal::entityTypeManager()->getStorage('taxonomy_term')
+    ->loadTree('authoritativesourcetype', 0, 2, FALSE);
+
+  // Build parent→children map and identify parent TIDs.
+  $child_to_parent = [];
+  $parent_tids = [];
+  foreach ($tree as $term) {
+    if ($term->depth == 0) {
+      $parent_tids[$term->tid] = $term->tid;
+    }
+    elseif (!empty($term->parents[0])) {
+      $child_to_parent[$term->tid] = $term->parents[0];
+    }
+  }
+
+  // Get existing sectionInfo (already set by laci_core's AuthorityHooks).
+  $existing = $form['#attached']['drupalSettings']['sectionInfo'] ?? [];
+
+  // For each child term, copy the parent's sectionInfo entry.
+  foreach ($child_to_parent as $child_tid => $parent_tid) {
+    if (!isset($existing[$child_tid]) && isset($existing[$parent_tid])) {
+      $form['#attached']['drupalSettings']['sectionInfo'][$child_tid] = $existing[$parent_tid];
+    }
+  }
+}
+
+/**
+ * Fix modal-specific button issues for the Add Authority dialog.
+ *
+ * 1. Fix Save button #name collision ('test' → 'modal_save').
+ * 2. Add #limit_validation_errors to Test button so it doesn't clear the form.
+ */
+function _laci_indiana_fix_modal_buttons(array &$form) {
+  $route_name = \Drupal::routeMatch()->getRouteName();
+
+  // Fix Test Authority button: allow values for fields the test callback
+  // needs, but skip full validation so the form isn't cleared on errors.
+  if (isset($form['actions']['test_button'])) {
+    $form['actions']['test_button']['#limit_validation_errors'] = [
+      ['field_type'],
+      ['field_section'],
+      ['field_selector'],
+    ];
+  }
+
+  // Only apply modal-specific fixes when rendered inside the modal route.
+  if ($route_name !== 'laci_add_authority_modal.modal') {
+    return;
+  }
+
+  // Fix the Save button's #name collision with the Test button.
+  if (isset($form['actions']['submit']) && ($form['actions']['submit']['#name'] ?? '') === 'test') {
+    $form['actions']['submit']['#name'] = 'modal_save';
+  }
+
+  // Attach the section label JS — laci_core only attaches it on node.add
+  // and entity.node.edit_form routes, not on the modal controller route.
+  $form['#attached']['library'][] = 'laci_core/authoritysectionlabel_js';
+}
+
+/**
+ * Natural sort an options array so numbered items sort numerically.
+ *
+ * Handles both flat arrays and arrays with a leading '_none' key.
+ * Sorts "Title 1" before "Title 10", and parent types alphabetically.
+ */
+function _laci_indiana_natural_sort_options(array &$options) {
+  // Preserve _none at the top.
+  $none = NULL;
+  if (isset($options['_none'])) {
+    $none = $options['_none'];
+    unset($options['_none']);
+  }
+
+  // Sort using natural comparison with numeric prefix priority.
+  uasort($options, function ($a, $b) {
+    // Handle string labels or nested arrays.
+    $label_a = is_string($a) ? $a : (is_array($a) ? reset($a) : (string) $a);
+    $label_b = is_string($b) ? $b : (is_array($b) ? reset($b) : (string) $b);
+
+    // Items starting with "-" are children (indented), group them after
+    // their parent by stripping the prefix for comparison.
+    $is_child_a = str_starts_with($label_a, '-');
+    $is_child_b = str_starts_with($label_b, '-');
+
+    // Extract "Title N" pattern for numeric sort.
+    $has_title_a = preg_match('/Title\s+(\d+)/', $label_a, $ma);
+    $has_title_b = preg_match('/Title\s+(\d+)/', $label_b, $mb);
+
+    // Title items sort among themselves numerically.
+    if ($has_title_a && $has_title_b) {
+      return (int) $ma[1] <=> (int) $mb[1];
+    }
+
+    // Title items sort after non-title items within the same group.
+    if ($has_title_a && !$has_title_b) {
+      return $is_child_b ? -1 : 1;
+    }
+    if (!$has_title_a && $has_title_b) {
+      return $is_child_a ? 1 : -1;
+    }
+
+    return strnatcasecmp($label_a, $label_b);
+  });
+
+  // Restore _none at the top.
+  if ($none !== NULL) {
+    $options = ['_none' => $none] + $options;
   }
 }
